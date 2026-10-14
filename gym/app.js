@@ -16,7 +16,7 @@ var FEEL=[["😌","سهل جدًا"],["🙂","سهل"],["💪","مظبوط"],["�
 var LS="ahmed-gym-app-v1";
 
 /* ---------- state ---------- */
-var S={sessions:[],profile:{weight:105.2,wlog:[],bp:[]},view:"home",open:null,reportId:null,lib:"P",confirm:null};
+var S={sessions:[],profile:{weight:"",wlog:[],bp:[]},view:"home",open:null,reportId:null,lib:"P",confirm:null};
 try{var o=JSON.parse(localStorage.getItem(LS)||"null");if(o){S.sessions=o.sessions||[];S.profile=Object.assign(S.profile,o.profile||{});}}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify({sessions:S.sessions,profile:S.profile}));}catch(e){}}
 
@@ -39,7 +39,7 @@ function done(){return S.sessions.filter(function(s){return s.status==="done";})
 function active(){return S.sessions.find(function(s){return s.status==="active";})||null;}
 function byId(id){return S.sessions.find(function(s){return s.id===id;});}
 function isStr(d){return d==="P"||d==="U"||d==="L";}
-function bw(){return num(S.profile.weight)||105;}
+function bw(){return num(S.profile.weight)||90;}
 function thumb(e){return e&&e.gal&&e.gal.length?e.gal[0].src:"";}
 function img(src,cls){return src?'<img class="'+(cls||"")+'" src="'+src+'" alt="" loading="lazy">':'<span class="ph0 '+(cls||"")+'">🏋️</span>';}
 function chip(d){return '<span class="chip" style="--c:'+DAY_COLOR[d]+'">'+esc(DAYS[d].t)+'</span>';}
@@ -265,7 +265,7 @@ function vBody(){
   var P=S.profile,wl=P.wlog.slice(-20),bp=P.bp.slice(-20);
   var h='<h1>صحتي</h1>';
   h+='<div class="card"><h3>الوزن</h3><div class="row" style="flex-wrap:nowrap"><input id="wIn" inputmode="decimal" placeholder="'+esc(P.weight)+' كجم"><button class="primary" data-act="addw">سجّل</button></div>'+
-    (wl.length?spark(wl.map(function(x){return x.kg;}),"var(--lime)")+'<p class="small muted">آخر وزن: <span class="n">'+wl[wl.length-1].kg+'</span> كجم · البداية <span class="n">105.2</span></p>':'<p class="small muted">سجّل وزنك مرة في الأسبوع الصبح على الريق.</p>')+'</div>';
+    (wl.length?spark(wl.map(function(x){return x.kg;}),"var(--lime)")+'<p class="small muted">آخر وزن: <span class="n">'+wl[wl.length-1].kg+'</span> كجم</p>':'<p class="small muted">سجّل وزنك مرة في الأسبوع الصبح على الريق.</p>')+'</div>';
   h+='<div class="card"><h3>الضغط</h3><div class="grid3"><input id="bS" inputmode="numeric" placeholder="العالي"><input id="bD" inputmode="numeric" placeholder="الواطي"><input id="bP" inputmode="numeric" placeholder="النبض"></div><button class="primary" data-act="addbp">سجّل القراية</button>'+
     (bp.length?spark(bp.map(function(x){return x.s;}),"var(--orange)",100,190)+'<table><tr><th>التاريخ</th><th>الضغط</th><th>النبض</th></tr>'+bp.slice().reverse().slice(0,10).map(function(x){return '<tr><td>'+esc(fmtDate(x.t,{day:"numeric",month:"short"}))+'</td><td><span class="n">'+x.s+'/'+x.d+'</span></td><td><span class="n">'+(x.p||"")+'</span></td></tr>';}).join("")+'</table>':'')+'</div>';
   h+='<div class="card"><h3>نسخة احتياطية</h3><p class="small muted">كل التسجيلات محفوظة على الموبايل ده بس. اعمل نسخة كل فترة وابعتها لنفسك، أو ابعتها لـ Claude عشان يراجع تقدمك.</p><div class="row"><button data-act="export">⬇ تصدير</button><button data-act="import">⬆ استيراد</button></div><input type="file" id="impF" accept="application/json,.json" hidden></div>';
