@@ -1,6 +1,11 @@
 (function(){
 "use strict";
-var G=window.GYM, EX=G.EX, DAYS=G.DAYS, W=G.W, C=G.C;
+var G=window.GYM, EX=G.EX, DAYS=G.DAYS, W=G.W, C=G.C, MACH=G.MACH||{};
+var MUS={chest:"صدر",shoulders:"كتف أمامي",side_delt:"كتف جانبي",rear_delt:"كتف خلفي",triceps:"ترايسبس",biceps:"باي",forearm:"ساعد",lats:"ضهر عريض",midback:"نص الضهر",traps:"ترابيس",abs:"بطن",glutes:"أرداف",quads:"فخد أمامي",hams:"فخد خلفي",adductors:"ضامة",abductors:"أبعدة",calves:"سمانة"};
+var LEGACY={chestPress:"machChest",pecFly:"pecDeck",triPush:"ropePush",facePullC:"revFly",hipThrust:"bridge",gobletSquat:"boxSquat",legCurl:"seatedCurl",row:"vRow"};
+function musText(e){if(e.mus)return e.mus;return (e.prim||[]).concat(e.sec||[]).map(function(m){return MUS[m]||m;}).join(" + ");}
+function keysOf(d,v){var x=DAYS[d].var;return x[v]||x.A;}
+function hasB(d){return !!DAYS[d].var.B;}
 var START=new Date(G.START+"T00:00:00").getTime();
 var DAY_ORDER=["P","U","L","D","C"];
 var DAY_COLOR={P:"var(--P)",U:"var(--U)",L:"var(--L)",D:"var(--D)",C:"var(--C)"};
@@ -18,6 +23,8 @@ var LS="ahmed-gym-app-v1";
 /* ---------- state ---------- */
 var S={sessions:[],profile:{weight:"",wlog:[],bp:[]},view:"home",open:null,reportId:null,lib:"P",confirm:null};
 try{var o=JSON.parse(localStorage.getItem(LS)||"null");if(o){S.sessions=o.sessions||[];S.profile=Object.assign(S.profile,o.profile||{});}}catch(e){}
+S.sessions.forEach(function(s){(s.items||[]).forEach(function(it){if(!EX[it.k]&&LEGACY[it.k])it.k=LEGACY[it.k];});s.items=(s.items||[]).filter(function(it){return EX[it.k];});if(!s.v)s.v="A";});
+S.libv="A";
 function save(){try{localStorage.setItem(LS,JSON.stringify({sessions:S.sessions,profile:S.profile}));}catch(e){}}
 
 /* ---------- helpers ---------- */
@@ -40,9 +47,10 @@ function active(){return S.sessions.find(function(s){return s.status==="active";
 function byId(id){return S.sessions.find(function(s){return s.id===id;});}
 function isStr(d){return d==="P"||d==="U"||d==="L";}
 function bw(){return num(S.profile.weight)||90;}
-function thumb(e){return e&&e.gal&&e.gal.length?e.gal[0].src:"";}
+function thumb(e){return e&&e.ek&&e.ek.length?e.ek[1]:e&&e.gal&&e.gal.length?e.gal[0].src:"";}
 function img(src,cls){return src?'<img class="'+(cls||"")+'" src="'+src+'" alt="" loading="lazy">':'<span class="ph0 '+(cls||"")+'">🏋️</span>';}
-function chip(d){return '<span class="chip" style="--c:'+DAY_COLOR[d]+'">'+esc(DAYS[d].t)+'</span>';}
+function chip(d,v){return '<span class="chip" style="--c:'+DAY_COLOR[d]+'">'+esc(DAYS[d].t)+(v&&hasB(d)?" "+v:"")+'</span>';}
+function nextVar(d){if(!hasB(d))return "A";var l=done().find(function(x){return x.day===d;});return l&&l.v==="A"?"B":l?"A":"A";}
 
 /* ---------- next day ---------- */
 function nextDay(){
@@ -74,11 +82,12 @@ function weekStats(){var ws=weekStart(Date.now());var xs=done().filter(function(
 
 /* ---------- session ---------- */
 function newSession(day){
+  var v=nextVar(day);
   var t=Date.now(),wk=week(t);
-  var items=DAYS[day].keys.map(function(k){var e=EX[k];var n=e.ph?(phase(wk)===0?2:3):e.sets;if(k==="wallSit")n=wk>=8?4:3;
+  var items=keysOf(day,v).map(function(k){var e=EX[k];var n=e.ph?(phase(wk)===0?2:3):e.sets;if(k==="wallSit")n=wk>=8?4:3;
     var last=lastSets(k,t),sets=[];for(var i=0;i<n;i++){var ls=last&&!last.alt&&last.sets[Math.min(i,last.sets.length-1)];sets.push({w:ls&&e.kind==="w"?ls.w:"",r:"",done:false});}
     return{k:k,alt:false,skipped:false,sets:sets};});
-  var s={id:"s"+uid(),day:day,status:"active",startedAt:t,endedAt:null,week:wk,bw:bw(),pre:{sys:"",dia:"",pulse:"",back:"",neck:""},warm:{},items:items,
+  var s={id:"s"+uid(),day:day,v:v,status:"active",startedAt:t,endedAt:null,week:wk,bw:bw(),pre:{sys:"",dia:"",pulse:"",back:"",neck:""},warm:{},items:items,
     cardio:{m:"ellip",min:0,since:null},cool:{},post:{back:"",neck:"",feel:null,note:""}};
   S.sessions.push(s);S.view="workout";S.open="warm";S.confirm=null;save();wakeOn();render();window.scrollTo(0,0);
 }
@@ -125,10 +134,10 @@ function vHome(){
   if(a){
     h+='<div class="hero" style="--hc:'+DAY_COLOR[a.day]+'"><span class="art">'+ART[a.day]+'</span><span class="tag">تمرين شغال</span><div class="ttl">'+esc(DAYS[a.day].t)+'</div><div class="lst">بدأ الساعة '+esc(fmtTime(a.startedAt))+'</div><button class="primary big" data-act="resume">كمّل التمرين ▶</button></div>';
   }else{
-    var nEx=D.keys.length,mins=nEx*8+D.cardio+10;
-    h+='<div class="hero" style="--hc:'+DAY_COLOR[nx]+'"><span class="art">'+ART[nx]+'</span><span class="tag">تمرين النهارده'+(new Date(t).getDay()===5?' · الجمعة يوم راحة، بس لو حابب':'')+'</span><div class="ttl">'+esc(D.t)+'</div><div class="ar">'+esc(D.ar)+' · '+esc(D.d)+'</div>'+
+    var nv=nextVar(nx),nEx=keysOf(nx,nv).length,mins=nEx*8+D.cardio+10;
+    h+='<div class="hero" style="--hc:'+DAY_COLOR[nx]+'"><span class="art">'+ART[nx]+'</span><span class="tag">تمرين النهارده'+(new Date(t).getDay()===5?' · الجمعة يوم راحة، بس لو حابب':'')+'</span><div class="ttl">'+esc(D.t)+(hasB(nx)?' <span style="font-size:.55em;opacity:.85">'+nv+'</span>':'')+'</div><div class="ar">'+esc(D.ar)+' · '+esc(D.d)+'</div><div class="lst">'+keysOf(nx,nv).map(function(k){return esc(EX[k].n);}).join(" · ")+'</div>'+
       '<div class="meta"><span><b>'+D.warm.length+'</b>إحماء</span><span><b>'+nEx+'</b>تمارين</span><span><b>'+D.cardio+'</b>د كارديو</span><span><b>'+D.cool.length+'</b>إطالات</span><span><b>~'+mins+'</b>دقيقة</span></div>'+
-      '<button class="primary big" data-act="start" data-day="'+nx+'">ابدأ '+esc(D.t)+' ▶</button></div>';
+      '<button class="primary big" data-act="start" data-day="'+nx+'">ابدأ '+esc(D.t)+(hasB(nx)?" "+nv:"")+' ▶</button></div>';
     h+='<div class="daybtns">'+DAY_ORDER.map(function(x){return '<button data-act="start" data-day="'+x+'" class="'+(x===nx?"on":"")+'" style="border-color:'+DAY_COLOR[x]+'"><b style="color:'+DAY_COLOR[x]+'">'+esc(DAYS[x].t)+'</b>'+esc(DAYS[x].ar)+'</button>';}).join("")+'</div>';
   }
   h+='<div class="stats">'+
@@ -162,7 +171,7 @@ function vWorkout(){
   var D=DAYS[s.day],m=metrics(s),lv=bpLevel(s);
   var tot=D.warm.length+m.exa+1+D.cool.length,dn=m.wd+m.exd+(cardioMin(s)>=D.cardio?1:0)+m.cd;
   var pc=dn/tot,rc=2*Math.PI*25;
-  var h='<div class="wtop"><div class="row between" style="flex-wrap:nowrap"><div class="wring"><svg viewBox="0 0 62 62"><circle cx="31" cy="31" r="25" fill="none" stroke="var(--card2)" stroke-width="6"/><circle cx="31" cy="31" r="25" fill="none" stroke="var(--lime)" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+rc+'" stroke-dashoffset="'+rc*(1-pc)+'" transform="rotate(-90 31 31)" style="transition:stroke-dashoffset .5s"/></svg><span>'+r0(pc*100)+'%</span></div><div style="flex:1">'+chip(s.day)+' <span class="muted small">بدأ '+esc(fmtTime(s.startedAt))+'</span><div class="small muted">خلصت <span class="n">'+dn+'</span> من <span class="n">'+tot+'</span> خطوة</div></div><div class="clock" id="clock">'+clock(Date.now()-s.startedAt)+'</div></div></div>';
+  var h='<div class="wtop"><div class="row between" style="flex-wrap:nowrap"><div class="wring"><svg viewBox="0 0 62 62"><circle cx="31" cy="31" r="25" fill="none" stroke="var(--card2)" stroke-width="6"/><circle cx="31" cy="31" r="25" fill="none" stroke="var(--lime)" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+rc+'" stroke-dashoffset="'+rc*(1-pc)+'" transform="rotate(-90 31 31)" style="transition:stroke-dashoffset .5s"/></svg><span>'+r0(pc*100)+'%</span></div><div style="flex:1">'+chip(s.day,s.v)+' <span class="muted small">بدأ '+esc(fmtTime(s.startedAt))+'</span><div class="small muted">خلصت <span class="n">'+dn+'</span> من <span class="n">'+tot+'</span> خطوة</div></div><div class="clock" id="clock">'+clock(Date.now()-s.startedAt)+'</div></div></div>';
   // 0: pre check
   h+='<div class="card"><div class="sec"><span class="num">0</span><div><h2>قبل ما تبدأ</h2><span class="muted">اقعد 5 دقايق وقيس الضغط</span></div></div>'+
     '<div class="grid3"><label class="f">الضغط العالي<input inputmode="numeric" data-f="pre.sys" value="'+esc(s.pre.sys)+'" placeholder="130"></label><label class="f">الواطي<input inputmode="numeric" data-f="pre.dia" value="'+esc(s.pre.dia)+'" placeholder="85"></label><label class="f">النبض<input inputmode="numeric" data-f="pre.pulse" value="'+esc(s.pre.pulse)+'" placeholder="75"></label></div>'+
@@ -197,18 +206,55 @@ function vWorkout(){
   return h;
 }
 
+function bodySVG(prim,sec){
+  function c(m){return prim.indexOf(m)>=0?"var(--lime)":sec.indexOf(m)>=0?"#ff9a5c":"#2c3342";}
+  function E(m,x,y,rx,ry){return '<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry="'+ry+'" fill="'+c(m)+'"/>';}
+  function R(m,x,y,w,h,r){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(r||6)+'" fill="'+c(m)+'"/>';}
+  var base='#1f2430',s='<svg viewBox="0 0 220 200" class="body">';
+  [[55,"أمام"],[165,"ورا"]].forEach(function(p){var x=p[0];
+    s+='<circle cx="'+x+'" cy="16" r="11" fill="'+base+'"/><rect x="'+(x-5)+'" y="26" width="10" height="8" fill="'+base+'"/>';
+    s+='<rect x="'+(x-22)+'" y="33" width="44" height="66" rx="14" fill="'+base+'"/><rect x="'+(x-21)+'" y="96" width="42" height="18" rx="8" fill="'+base+'"/>';
+    s+='<rect x="'+(x-34)+'" y="38" width="12" height="62" rx="6" fill="'+base+'"/><rect x="'+(x+22)+'" y="38" width="12" height="62" rx="6" fill="'+base+'"/>';
+    s+='<rect x="'+(x-20)+'" y="110" width="18" height="78" rx="8" fill="'+base+'"/><rect x="'+(x+2)+'" y="110" width="18" height="78" rx="8" fill="'+base+'"/>';
+    s+='<text x="'+x+'" y="198" text-anchor="middle" font-size="9" fill="#6b7488" font-family="Cairo">'+p[1]+'</text>';});
+  var f=55;
+  s+=E("shoulders",f-25,40,7,7)+E("shoulders",f+25,40,7,7)+E("side_delt",f-30,46,4,8)+E("side_delt",f+30,46,4,8);
+  s+=R("chest",f-19,38,18,18,6)+R("chest",f+1,38,18,18,6)+R("abs",f-9,58,18,36,6)+E("biceps",f-28,62,5,10)+E("biceps",f+28,62,5,10);
+  s+=E("forearm",f-29,86,4,10)+E("forearm",f+29,86,4,10)+E("abductors",f-19,104,4,8)+E("abductors",f+19,104,4,8);
+  s+=E("quads",f-11,132,8,22)+E("quads",f+11,132,8,22)+E("adductors",f-3,118,3,10)+E("adductors",f+3,118,3,10)+E("calves",f-11,170,5,12)+E("calves",f+11,170,5,12);
+  var b=165;
+  s+=R("traps",b-11,30,22,16,6)+E("rear_delt",b-25,42,7,7)+E("rear_delt",b+25,42,7,7)+E("triceps",b-28,62,5,11)+E("triceps",b+28,62,5,11);
+  s+=R("midback",b-9,46,18,18,5)+E("lats",b-14,66,7,16)+E("lats",b+14,66,7,16)+E("forearm",b-29,86,4,10)+E("forearm",b+29,86,4,10);
+  s+=E("glutes",b-10,104,10,10)+E("glutes",b+10,104,10,10)+E("hams",b-11,136,8,20)+E("hams",b+11,136,8,20)+E("calves",b-11,168,6,13)+E("calves",b+11,168,6,13);
+  return s+'</svg>';
+}
+function demoHTML(e){
+  if(!e.ek||!e.ek.length)return "";
+  return '<div class="demo" data-act="demo"><div class="stage"><img class="f1" src="'+e.ek[0]+'" alt=""><img class="f2" src="'+e.ek[1]+'" alt=""></div>'+
+    '<div class="ph"><span class="u">⬆ الحركة · ثانيتين · طلّع النفس</span><span class="d">⬇ رجّع ببطء · 3 ثواني</span></div>'+
+    '<div class="dctl"><button type="button" data-act="dpause">⏸ إيقاف</button><button type="button" data-act="dslow">🐢 أبطأ</button></div></div>';
+}
+function exDetail(e,it){
+  var h='';
+  if(e.ek&&e.ek.length)h+=demoHTML(e);
+  if(e.prim&&e.prim.length)h+='<div class="musrow">'+bodySVG(e.prim,e.sec||[])+'<div class="leg"><b>العضلات</b><div><i style="background:var(--lime)"></i>أساسية: '+e.prim.map(function(m){return MUS[m];}).join("، ")+'</div>'+((e.sec||[]).length?'<div><i style="background:#ff9a5c"></i>مساعدة: '+e.sec.map(function(m){return MUS[m];}).join("، ")+'</div>':'')+'</div></div>';
+  if(e.mach&&e.mach.length)h+='<div class="mlabel">📍 جهازك في أوميغا</div><div class="gal mach">'+e.mach.map(function(k){var m=MACH[k];return m?'<figure><img src="'+m.src+'" alt="" loading="lazy" data-act="view" data-src="'+m.src+'" data-cap="'+esc(m.n)+'"><figcaption>'+esc(m.n)+'</figcaption></figure>':'';}).join("")+'</div>';
+  if((!e.ek||!e.ek.length)&&e.gal&&e.gal.length)h+='<div class="gal">'+e.gal.map(function(g){return '<figure><img src="'+g.src+'" alt="" loading="lazy" data-act="view" data-src="'+g.src+'" data-cap="'+esc(g.cap)+'"><figcaption>'+esc(g.cap)+(g.cr?'<small>'+esc(g.cr)+'</small>':'')+'</figcaption></figure>';}).join("")+'</div>';
+  if(e.gym)h+='<div class="gym"><b>في أوميغا:</b> '+esc(e.gym)+'</div>';
+  h+='<div class="how"><b>إزاي تعمله</b><ol>'+e.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ol></div>';
+  if(e.cues&&e.cues.length)h+='<div class="cues"><b>⚠ خلي بالك</b><ul>'+e.cues.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div>';
+  if(e.alt.length)h+='<div class="alts"><b style="color:var(--blue)">لو الجهاز مشغول:</b> '+e.alt.map(esc).join(" · ")+'</div>'+(it?'<label class="altchk"><input type="checkbox" data-act="alt" data-k="'+it.k+'"'+(it.alt?" checked":"")+'> عملت بديل</label>':'');
+  return h;
+}
 function vEx(s,it,i){
   var e=EX[it.k],open=S.open===it.k,cnt=it.sets.filter(function(x){return x.done;}).length,dn=cnt===it.sets.length&&cnt>0;
   var h='<div class="ex'+(dn?" done":"")+(it.skipped?" skip":"")+'" id="ex-'+it.k+'"><button class="exh" data-act="toggle" data-k="'+it.k+'" aria-expanded="'+open+'">'+img(thumb(e))+
-    '<span><span class="nm">'+(i+1)+'. '+esc(e.n)+'</span><br><span class="tg"><b><span class="n">'+it.sets.length+'</span> × '+rng(repsOf(e,s.week))+'</b> · راحة <span class="n">'+e.rest+'</span>ث · '+esc(e.mus)+'</span></span>'+
+    '<span><span class="nm">'+(i+1)+'. '+esc(e.n)+'</span><br><span class="tg"><b><span class="n">'+it.sets.length+'</span> × '+rng(repsOf(e,s.week))+'</b> · راحة <span class="n">'+e.rest+'</span>ث · '+esc(musText(e))+'</span></span>'+
     '<span class="state">'+(dn?"✓":it.skipped?"–":'<span class="n">'+cnt+'/'+it.sets.length+'</span>')+'</span></button>';
   if(open){
     var last=lastSets(it.k,s.startedAt),noW=e.kind!=="w"||(e.kind==="w"&&it.alt&&/وزن جسمك/.test(e.alt[0]||""));
     h+='<div class="exb">';
-    if(e.gal.length)h+='<div class="gal">'+e.gal.map(function(g){return '<figure><img src="'+g.src+'" alt="" loading="lazy" data-act="view" data-src="'+g.src+'" data-cap="'+esc(g.cap)+'"><figcaption>'+esc(g.cap)+(g.cr?'<small>'+esc(g.cr)+'</small>':'')+'</figcaption></figure>';}).join("")+'</div>';
-    if(e.gym)h+='<div class="gym"><b>في أوميغا:</b> '+esc(e.gym)+'</div>';
-    h+='<div class="how"><b>إزاي تعمله</b><ol>'+e.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ol></div>';
-    if(e.alt.length)h+='<div class="alts"><b style="color:var(--blue)">لو الجهاز مشغول:</b> '+e.alt.map(esc).join(" · ")+'</div><label class="altchk"><input type="checkbox" data-act="alt" data-k="'+it.k+'"'+(it.alt?" checked":"")+'> عملت بديل</label>';
+    h+=exDetail(e,it);
     if(last)h+='<div class="last">آخر مرة ('+esc(fmtDate(last.t,{day:"numeric",month:"short"}))+'): '+last.sets.map(function(x){return (num(x.w)?'<span class="n">'+esc(x.w)+'</span>×':'')+'<span class="n">'+esc(x.r)+'</span>';}).join(" · ")+'</div>';
     h+='<div class="sets"><div class="hdr"><span>#</span><span>'+(noW?"":"كجم")+'</span><span>'+(e.kind==="time"?"ثواني":"عدّات")+'</span><span></span></div>';
     it.sets.forEach(function(st,j){h+='<div class="set'+(st.done?" ok":"")+'"><span class="i">'+(j+1)+'</span>'+
@@ -250,9 +296,8 @@ function vLib(){
   var h='<h1>التمارين</h1><div class="libday">'+DAY_ORDER.map(function(x){return '<button data-act="lib" data-d="'+x+'" class="'+(x===d?"on":"")+'">'+esc(DAYS[x].t)+' · '+esc(DAYS[x].ar)+'</button>';}).join("")+'</div>';
   h+='<div class="sec"><span class="num">1</span><h2>الإحماء</h2></div>'+D.warm.map(function(k){return wcCard("w",k,null);}).join("");
   h+='<div class="sec"><span class="num">2</span><h2>التمارين</h2></div>';
-  D.keys.forEach(function(k,i){var e=EX[k];h+='<div class="card"><div class="row" style="gap:12px;flex-wrap:nowrap">'+img(thumb(e),"th")+'<div><h3>'+(i+1)+'. '+esc(e.n)+'</h3><span class="small muted">'+esc(e.en)+' · '+esc(e.mus)+' · <b style="color:var(--lime)">'+rng(repsOf(e,week(Date.now())))+'</b></span></div></div>'+
-    (e.gal.length>1?'<div class="gal">'+e.gal.map(function(g){return '<figure><img src="'+g.src+'" alt="" loading="lazy" data-act="view" data-src="'+g.src+'" data-cap="'+esc(g.cap)+'"><figcaption>'+esc(g.cap)+(g.cr?'<small>'+esc(g.cr)+'</small>':'')+'</figcaption></figure>';}).join("")+'</div>':'')+
-    (e.gym?'<div class="gym"><b>في أوميغا:</b> '+esc(e.gym)+'</div>':'')+'<div class="how"><ol>'+e.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ol></div>'+(e.alt.length?'<div class="alts"><b style="color:var(--blue)">البدائل:</b> '+e.alt.map(esc).join(" · ")+'</div>':'')+'</div>';});
+  if(hasB(d))h+='<div class="libday">'+["A","B"].map(function(v){return '<button data-act="libv" data-v="'+v+'" class="'+(S.libv===v?"on":"")+'">نسخة '+v+'</button>';}).join("")+'</div>';
+  keysOf(d,S.libv).forEach(function(k,i){var e=EX[k];h+='<div class="card"><div><h3>'+(i+1)+'. '+esc(e.n)+'</h3><span class="small muted">'+esc(e.en)+' · <b style="color:var(--lime)">'+e.sets+' × '+rng(repsOf(e,week(Date.now())))+'</b> · راحة '+e.rest+'ث</span></div>'+exDetail(e,null)+'</div>';});
   h+='<div class="sec"><span class="num">3</span><h2>الإطالات</h2></div>'+D.cool.map(function(k){return wcCard("c",k,null);}).join("");
   return h;
 }
@@ -288,7 +333,11 @@ document.addEventListener("click",function(ev){
   if(a==="start"){if(s){S.view="workout";render();return;}newSession(b.dataset.day);return;}
   if(a==="resume"){S.view="workout";wakeOn();render();return;}
   if(a==="report"){S.reportId=b.dataset.id;S.view="report";S.confirm=null;render();window.scrollTo(0,0);return;}
-  if(a==="lib"){S.lib=b.dataset.d;render();return;}
+  if(a==="lib"){S.lib=b.dataset.d;S.libv="A";render();return;}
+  if(a==="libv"){S.libv=b.dataset.v;render();return;}
+  if(a==="dpause"){var dm=b.closest(".demo");dm.classList.toggle("paused");b.textContent=dm.classList.contains("paused")?"▶ تشغيل":"⏸ إيقاف";return;}
+  if(a==="dslow"){var dm2=b.closest(".demo");dm2.classList.toggle("slow");b.textContent=dm2.classList.contains("slow")?"🐇 عادي":"🐢 أبطأ";return;}
+  if(a==="demo"){return;}
   if(a==="view"){$("#viewer-img").src=b.dataset.src;$("#viewer-cap").textContent=b.dataset.cap||"";$("#viewer").hidden=false;return;}
   if(a==="addw"){var v=num($("#wIn").value);if(v>30&&v<300){S.profile.weight=v;S.profile.wlog.push({t:Date.now(),kg:v});save();render();}return;}
   if(a==="addbp"){var x=num($("#bS").value),y=num($("#bD").value);if(x>60&&y>30){S.profile.bp.push({t:Date.now(),s:x,d:y,p:num($("#bP").value)});save();render();}return;}

@@ -186,3 +186,29 @@ button.big.primary{animation:glow 2.4s ease-in-out infinite}
 .splash.out{opacity:0;pointer-events:none}
 .splash div{font-family:var(--num);font-size:44px;letter-spacing:3px;color:var(--lime);text-align:center;line-height:1}
 .splash small{display:block;font-family:var(--font);font-size:14px;color:var(--ink2);letter-spacing:0;margin-top:8px}
+
+/* ---------- v2: animated demo, muscle map, machines ---------- */
+.demo{position:relative;background:#fff;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+.stage{position:relative;width:100%;aspect-ratio:1/1;max-height:320px;margin:0 auto}
+.stage img{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain}
+.stage .f2{animation:tempo 5.5s ease-in-out infinite}
+@keyframes tempo{0%,6%{opacity:0}36%,50%{opacity:1}94%,100%{opacity:0}}
+.ph{position:absolute;top:10px;inset-inline:10px;height:28px}
+.ph span{position:absolute;inset-inline-start:0;font-size:12px;font-weight:900;border-radius:999px;padding:3px 10px;color:#0c0e12}
+.ph .u{background:var(--lime);animation:pu 5.5s linear infinite}
+.ph .d{background:#ffd27a;animation:pd 5.5s linear infinite}
+@keyframes pu{0%,43%{opacity:1}44%,100%{opacity:0}}
+@keyframes pd{0%,43%{opacity:0}44%,100%{opacity:1}}
+.demo.slow .f2,.demo.slow .ph span{animation-duration:9s}
+.demo.paused .f2,.demo.paused .ph span{animation-play-state:paused}
+.dctl{position:absolute;bottom:8px;inset-inline:8px;display:flex;gap:6px;justify-content:flex-end}
+.dctl button{min-height:34px;padding:4px 10px;font-size:12px;background:rgba(12,14,18,.85);border-color:transparent}
+.musrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:8px 10px}
+.musrow .body{width:150px;height:auto}
+.musrow .leg{font-size:13px;display:grid;gap:4px}
+.musrow .leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:middle}
+.mlabel{font-weight:900;font-size:14px;color:var(--blue)}
+.gal.mach figure{flex-basis:62%}
+.gal.mach img{height:200px;object-fit:cover;background:#222}
+.cues{font-size:14px;background:#2a1d0c;border:1px solid #5a3d14;border-radius:12px;padding:8px 12px}
+.cues b{color:var(--yellow)} .cues ul{margin:4px 0 0;padding-inline-start:20px}
