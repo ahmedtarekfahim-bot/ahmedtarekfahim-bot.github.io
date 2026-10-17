@@ -1,5 +1,5 @@
-/* offline cache: the whole app is cached on first open so it works without internet */
-var V = "kids-v1";
+﻿/* offline cache: the whole app is cached on first open so it works without internet */
+var V = "kids-v2";
 var SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "manifest.webmanifest", "fonts/fredoka.woff2", "fonts/baloo-ar.woff2", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

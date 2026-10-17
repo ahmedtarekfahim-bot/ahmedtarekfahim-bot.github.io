@@ -78,26 +78,53 @@
 
   /* ---------- sound fx ---------- */
   var actx = null;
+  /* note = [frequency, start, length, wave, volume, slide-to frequency, vibrato] */
   function tone(seq) {
     if (!S.sfx) return;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      var t = actx.currentTime;
+      if (actx.state === "suspended") actx.resume();
+      var t = actx.currentTime + 0.02;
       seq.forEach(function (n) {
-        var o = actx.createOscillator(), g = actx.createGain();
-        o.type = n[3] || "sine"; o.frequency.value = n[0];
-        g.gain.setValueAtTime(0.0001, t + n[1]);
-        g.gain.exponentialRampToValueAtTime(0.25, t + n[1] + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + n[2]);
-        o.connect(g); g.connect(actx.destination); o.start(t + n[1]); o.stop(t + n[1] + n[2] + 0.05);
+        var st = t + n[1], end = st + n[2], vol = n[4] || 0.22;
+        var o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
+        o.type = n[3] || "sine"; o.frequency.setValueAtTime(n[0], st);
+        if (n[5]) o.frequency.exponentialRampToValueAtTime(n[5], end);
+        if (n[6]) {
+          var lfo = actx.createOscillator(), lg = actx.createGain();
+          lfo.frequency.value = n[6]; lg.gain.value = n[0] * 0.04;
+          lfo.connect(lg); lg.connect(o.frequency); lfo.start(st); lfo.stop(end + 0.05);
+        }
+        f.type = "lowpass"; f.frequency.value = o.type === "sawtooth" ? 1100 : 6000;
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(vol, st + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, end);
+        o.connect(f); f.connect(g); g.connect(actx.destination); o.start(st); o.stop(end + 0.05);
       });
     } catch (e) { /* no audio */ }
   }
+  /* bell-like note: tone plus a soft octave above */
+  function bell(f, at, len, vol) { return [[f, at, len, "triangle", vol || 0.22], [f * 2, at, len * 0.7, "sine", (vol || 0.22) * 0.35]]; }
+  function tune(notes) { var s = []; notes.forEach(function (n) { s = s.concat(bell(n[0], n[1], n[2], n[3])); }); tone(s); }
+  var C5 = 523, D5 = 587, E5 = 659, G5 = 784, A5 = 880, C6 = 1047, E6 = 1319, G6 = 1568;
+  var GOOD_TUNES = [
+    [[C5, 0, .14], [E5, .1, .14], [G5, .2, .14], [C6, .3, .45]],
+    [[G5, 0, .12], [A5, .09, .12], [C6, .18, .12], [E6, .27, .5, .16]],
+    [[E5, 0, .12], [G5, .1, .12], [E6, .2, .2, .16], [C6, .32, .45]]
+  ];
   var SFX = {
-    good: function () { tone([[660, 0, .15], [880, .12, .22]]); },
-    bad: function () { tone([[220, 0, .25, "triangle"], [180, .15, .3, "triangle"]]); },
-    win: function () { tone([[523, 0, .15], [659, .14, .15], [784, .28, .15], [1047, .42, .4]]); },
-    tap: function () { tone([[520, 0, .07]]); }
+    /* happy jingle with a sparkle on top */
+    good: function () { tune(pick(GOOD_TUNES)); tone([[G6, .42, .25, "sine", .06], [C6 * 2, .5, .3, "sine", .05]]); },
+    /* cartoon trombone: wah wah wah waaah */
+    bad: function () {
+      tone([[392, 0, .28, "sawtooth", .16, 380], [370, .3, .28, "sawtooth", .16, 355], [349, .6, .28, "sawtooth", .16, 335], [330, .9, .8, "sawtooth", .16, 300, 6]]);
+    },
+    /* end of a game: little fanfare and a chord */
+    win: function () {
+      tune([[G5 / 2 * 2, 0, .12], [G5, .13, .12], [G5, .26, .12], [C6, .4, .25], [A5, .66, .12], [C6, .8, .7]]);
+      tone([[C5, .8, .9, "triangle", .1], [E5, .8, .9, "triangle", .1], [G5, .8, .9, "triangle", .1]]);
+    },
+    tap: function () { tone([[D5, 0, .06, "triangle", .12]]); }
   };
   var CHEER = [["Great job!", "أحسنت! 🎉"], ["Super!", "رائع! 🌟"], ["Well done!", "برافو! 👏"], ["Excellent!", "ممتاز! 🏆"], ["You are a star!", "أنت نجم! ⭐"], ["Awesome!", "مذهل! 🚀"]];
   var OOPS = [["Oops! Try again.", "حاول تاني 💪"], ["Not quite!", "قربت! 🙂"]];
