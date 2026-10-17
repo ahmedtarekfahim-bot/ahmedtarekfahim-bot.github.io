@@ -1,5 +1,5 @@
 /* offline cache: app shell first, images and fonts cached as they load */
-var V = "gym-v2";
+var V = "gym-v3";
 var SHELL = ["./", "index.html", "style.css", "app.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
