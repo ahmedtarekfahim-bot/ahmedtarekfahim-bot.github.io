@@ -34,5 +34,17 @@
         "25:BD:04:A9:08:9E:F8:4F:03:D2:07:E6:9C:53:32:2E:72:7C:54:F8:45:66:3F:80:9E:43:C9:74:31:79:91:CA"
       ]
     }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.ahmedtarekfahimbot.kids",
+      "sha256_cert_fingerprints": [
+        "63:2C:D4:B2:69:40:05:76:36:FA:B0:09:A3:A0:01:24:E8:6B:2A:40:6A:CB:D5:FF:14:92:9E:83:F1:63:6F:0D"
+      ]
+    }
   }
 ]
