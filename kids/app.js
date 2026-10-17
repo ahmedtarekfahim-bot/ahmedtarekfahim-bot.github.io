@@ -4,6 +4,7 @@
 
   /* ---------- storage ---------- */
   var KEY = "super-kid-v1";
+  var APP_V = "4";
   var DEF = {
     name: "", rate: 0.85, voice: "", voiceSet: "en1", reps: 2, gap: 3, auto: true, ar: false, sfx: true,
     gameCats: [], stars: 0, played: 0, best: {}, learned: {},
@@ -283,7 +284,8 @@
       '<h2 class="sec">🌞 <span class="en">Word of the day</span> <span class="ar note" style="margin:0">كلمة اليوم</span></h2>' +
       '<button class="line" data-a="say" data-t="' + esc(wod.en) + '" data-ar="' + esc(wod.ar) + '">' + emo(wod.em) +
       '<span class="tx"><span class="en">' + esc(wod.en) + '</span><span class="ar">' + esc(wod.ar) + '</span></span><span class="play">🔊</span></button>' +
-      '<div class="row" style="margin-top:18px"><button class="btn white big" data-a="go" data-h="#settings">⚙️ <span class="ar">الإعدادات: الصوت والتكرار</span></button></div>';
+      '<div class="row" style="margin-top:18px"><button class="btn white big" data-a="go" data-h="#settings">⚙️ <span class="ar">الإعدادات: الصوت والتكرار</span></button></div>' +
+      '<p class="note ar" style="text-align:center;margin-top:14px">نسخة ' + APP_V + " · 🔊 أصوات معلّمة متسجّلة</p>";
   };
   function tile(h, ic, t1, t2, color, cnt) {
     return '<button class="tile" style="background:' + color + '" data-a="go" data-h="' + h + '">' + (cnt ? '<span class="cnt">' + cnt + "</span>" : "") +
@@ -932,6 +934,25 @@
   };
 
   /* ---------- start ---------- */
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(function () { /* offline cache unavailable */ });
+  /* updates: the app may stay open in the background for days, so check the live version
+     on every start and every time it comes back to the screen, then reload into it */
+  var reloading = false;
+  function checkUpdate() {
+    fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+      v = v.trim();
+      if (!v || v === APP_V || reloading) return;
+      try { if (sessionStorage.getItem("tried-v") === v) return; sessionStorage.setItem("tried-v", v); } catch (e) { /* no session storage */ }
+      reloading = true;
+      var go = function () { location.replace(location.pathname + "?v=" + v + location.hash); };
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+        navigator.serviceWorker.getRegistration().then(function (reg) { return reg && reg.update(); }).catch(function () {}).then(function () { setTimeout(go, 600); });
+      } else go();
+    }).catch(function () { /* offline */ });
+  }
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js", {updateViaCache: "none"}).catch(function () { /* offline cache unavailable */ });
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") checkUpdate(); });
+  setTimeout(checkUpdate, 1500);
   route();
 })();
