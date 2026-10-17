@@ -1,0 +1,20 @@
+{
+  "name": "Super Kid · English & Math",
+  "short_name": "Super Kid",
+  "description": "English words, verbs, sentences and math games for kids, with Arabic meaning and voice",
+  "lang": "en",
+  "dir": "ltr",
+  "id": "/kids/",
+  "start_url": "/kids/",
+  "scope": "/kids/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#d9f3ff",
+  "theme_color": "#6c4cff",
+  "categories": ["education", "kids"],
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
