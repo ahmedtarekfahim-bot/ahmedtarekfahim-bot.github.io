@@ -5,7 +5,7 @@
   /* ---------- storage ---------- */
   var KEY = "super-kid-v1";
   var DEF = {
-    name: "", rate: 0.85, voice: "", reps: 2, gap: 3, auto: true, ar: false, sfx: true,
+    name: "", rate: 0.85, voice: "", voiceSet: "en1", reps: 2, gap: 3, auto: true, ar: false, sfx: true,
     gameCats: [], stars: 0, played: 0, best: {}, learned: {},
     math: {ops: ["+"], a: 1, b: 1, n: 10, table: 0}
   };
@@ -58,7 +58,40 @@
     return list[0];
   }
   function arVoice() { return voices.filter(function (v) { return /^ar/i.test(v.lang); })[0] || null; }
+
+  /* recorded voices: every word and sentence is a ready mp3 (audio/<voice>/<id>.mp3).
+     key() must match key() in the recording script. The phone voice is only a fallback. */
+  var IDX = null;
+  fetch("audio/index.json").then(function (r) { return r.json(); }).then(function (j) { IDX = j; }).catch(function () { /* offline before first load */ });
+  function key(t) { return String(t).toLowerCase().replace(/[^a-z0-9؀-ۿ' ]+/g, " ").replace(/\s+/g, " ").trim(); }
+  function clipUrl(text, lang) {
+    if (!IDX) return null;
+    var ar = lang === "ar", id = (ar ? IDX.ar : IDX.en)[key(text)];
+    return id == null ? null : "audio/" + (ar ? "ar" : (S.voiceSet === "en2" ? "en2" : "en1")) + "/" + id + ".mp3";
+  }
+  var player = new Audio();
+  var playEnd = null;
+  function playClip(url, rate) {
+    return new Promise(function (res) {
+      var done = false;
+      function fin() { if (done) return; done = true; player.onended = player.onerror = null; playEnd = null; res(); }
+      playEnd = fin;
+      player.onended = fin; player.onerror = fin;
+      player.src = url;
+      try { player.preservesPitch = true; } catch (e) { /* older browsers */ }
+      player.playbackRate = rate;
+      var p = player.play();
+      if (p && p.catch) p.catch(fin);
+      setTimeout(fin, 15000);
+    });
+  }
+  var SPEED = {0.65: 0.78, 0.75: 0.88, 0.85: 1, 1: 1.12};
   function say(text, lang, rate) {
+    var url = clipUrl(text, lang);
+    if (url) return playClip(url, rate ? 1 : (SPEED[S.rate] || 1));
+    return sayDevice(text, lang, rate);
+  }
+  function sayDevice(text, lang, rate) {
     return new Promise(function (res) {
       if (!synth || !text) { setTimeout(res, 500); return; }
       var ar = lang === "ar";
@@ -74,7 +107,11 @@
       try { synth.resume(); synth.speak(u); } catch (e) { fin(); }
     });
   }
-  function hush() { if (synth) try { synth.cancel(); } catch (e) { /* ignore */ } }
+  function hush() {
+    try { player.pause(); } catch (e) { /* ignore */ }
+    if (playEnd) playEnd();
+    if (synth) try { synth.cancel(); } catch (e) { /* ignore */ }
+  }
 
   /* ---------- sound fx ---------- */
   var actx = null;
@@ -849,27 +886,45 @@
   /* ---------- settings ---------- */
   R.settings = function () {
     head("Settings", "الإعدادات", true);
-    var vs = enVoices(), cur = enVoice();
     function chips(name, vals, curv, fmt) { return '<div class="seg">' + vals.map(function (v) { return '<button class="chip' + (String(v) === String(curv) ? " on" : "") + '" data-a="sopt" data-n="' + name + '" data-v="' + v + '">' + fmt(v) + "</button>"; }).join("") + "</div>"; }
     function tog(name, label, desc) { return '<div class="set"><div class="switch"><div><div class="lb ar">' + label + '</div><div class="ds ar">' + desc + '</div></div><button class="tog' + (S[name] ? " on" : "") + '" data-a="stog" data-n="' + name + '" aria-label="' + label + '"></button></div></div>'; }
     app.innerHTML = '<div class="setbox">' +
       '<div class="set"><div class="lb ar">👦 اسم البطل</div><input type="text" id="nm" maxlength="20" placeholder="Name" value="' + esc(S.name) + '" dir="ltr"></div>' +
-      '<div class="set"><div class="lb ar">🗣️ الصوت الإنجليزي</div><div class="ds ar">اختار الصوت الأوضح. الأصوات بتيجي من الموبايل نفسه.</div>' +
-      (vs.length ? '<select id="vsel">' + vs.map(function (v) { return '<option value="' + esc(v.name) + '"' + (cur && v.name === cur.name ? " selected" : "") + ">" + esc(v.name + " (" + v.lang + ")") + "</option>"; }).join("") + "</select>"
-        : '<div class="ds ar" style="color:var(--bad)">مفيش أصوات إنجليزي ظاهرة لسه. لو على أندرويد: الإعدادات ← تحويل النص إلى كلام ← Google ← نزّل English.</div>') +
+      '<div class="set"><div class="lb ar">🗣️ صوت المعلّمة</div><div class="ds ar">أصوات متسجلة بنطق صحيح وواضح</div>' +
+      '<div class="seg"><button class="chip' + (S.voiceSet !== "en2" ? " on" : "") + '" data-a="svoice" data-v="en1">🇺🇸 <span class="en">Emma</span> <span class="ar">أمريكي</span></button>' +
+      '<button class="chip' + (S.voiceSet === "en2" ? " on" : "") + '" data-a="svoice" data-v="en2">🇬🇧 <span class="en">Sonia</span> <span class="ar">بريطاني</span></button></div>' +
       '<button class="btn sun" style="margin-top:8px" data-a="stest">🔊 <span class="en">Test: Hello! How are you?</span></button></div>' +
+      '<div class="set"><div class="lb ar">📥 الأصوات من غير نت</div><div class="ds ar">نزّل كل التسجيلات مرة واحدة (حوالي 20 ميجا) عشان البرنامج يتكلم حتى لو مفيش نت</div>' +
+      '<button class="btn white" style="margin-top:6px" data-a="sdl" id="dlb">📥 <span class="ar">نزّل الأصوات</span></button></div>' +
       '<div class="set"><div class="lb ar">🐢 سرعة الكلام</div>' + chips("rate", [0.65, 0.75, 0.85, 1], S.rate, function (v) { return {0.65: "بطيء", 0.75: "هادي", 0.85: "متوسط", 1: "عادي"}[v]; }) + "</div>" +
       '<div class="set"><div class="lb ar">🔁 عدد مرات تكرار النطق</div><div class="ds ar">الكلمة أو الجملة تتقري كام مرة قبل ما ينقل</div>' + chips("reps", [1, 2, 3, 4, 5], S.reps, function (v) { return v + " مرة"; }) + "</div>" +
       '<div class="set"><div class="lb ar">🎤 وقت الترديد بعد كل مرة</div><div class="ds ar">ثواني يسكت فيها عشان الطفل يقول ورا الصوت</div>' + chips("gap", [0, 2, 3, 5, 8], S.gap, function (v) { return v ? v + " ثواني" : "من غير"; }) + "</div>" +
       tog("auto", "⏩ ينقل للي بعده تلقائي", "لو مقفول: بيقف بعد كل كلمة لحد ما تضغط التالي") +
-      tog("ar", "🇸🇦 يقرا الترجمة العربي كمان", arVoice() ? "مرة واحدة بعد الإنجليزي" : "محتاج صوت عربي على الموبايل (Google TTS ← العربية)") +
+      tog("ar", "🇸🇦 يقرا الترجمة العربي كمان", "مرة واحدة بعد الإنجليزي") +
       tog("sfx", "🎵 أصوات الألعاب", "صوت الإجابة الصح والغلط") +
       '</div><button class="btn white big" data-a="sreset">🗑️ <span class="ar">ابدأ من الأول (يمسح النجوم)</span></button>';
     var nm = $("#nm"); nm.addEventListener("input", function () { S.name = nm.value.trim(); save(); });
-    var vsel = $("#vsel"); if (vsel) vsel.addEventListener("change", function () { S.voice = vsel.value; save(); say("Hello! I am your new voice."); });
   };
   A.sopt = function (el, d) { S[d.n] = parseFloat(d.v); save(); SFX.tap(); var y = window.scrollY; R.settings(); window.scrollTo(0, y); if (d.n === "rate") say("This is my speed."); };
   A.stog = function (el, d) { S[d.n] = !S[d.n]; save(); el.classList.toggle("on", S[d.n]); SFX.tap(); };
+  A.svoice = function (el, d) { S.voiceSet = d.v; save(); var y = window.scrollY; R.settings(); window.scrollTo(0, y); hush(); say("Hello! I am your new voice."); };
+  A.sdl = async function (el) {
+    if (!IDX || el.disabled) return;
+    el.disabled = true;
+    var urls = [], en = S.voiceSet === "en2" ? "en2" : "en1";
+    Object.keys(IDX.en).forEach(function (k) { urls.push("audio/" + en + "/" + IDX.en[k] + ".mp3"); });
+    if (S.ar) Object.keys(IDX.ar).forEach(function (k) { urls.push("audio/ar/" + IDX.ar[k] + ".mp3"); });
+    var c = await caches.open("kids-audio"), done = 0, i = 0;
+    async function worker() {
+      while (i < urls.length) {
+        var u = urls[i++];
+        try { if (!(await c.match(u))) { var r = await fetch(u); if (r.ok) await c.put(u, r); } } catch (e) { /* skip, retry next time */ }
+        done++; if (done % 20 === 0 || done === urls.length) el.innerHTML = "📥 " + Math.round(done / urls.length * 100) + "%";
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
+    el.innerHTML = '✅ <span class="ar">الأصوات متنزّلة</span>';
+  };
   A.stest = function () { hush(); say("Hello! How are you?").then(function () { if (S.ar) return say("مرحباً، كيف حالك؟", "ar"); }); };
   A.sreset = function () {
     if (!confirm("أمسح النجوم والنتايج؟")) return;
