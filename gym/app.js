@@ -47,7 +47,8 @@ function active(){return S.sessions.find(function(s){return s.status==="active";
 function byId(id){return S.sessions.find(function(s){return s.id===id;});}
 function isStr(d){return d==="P"||d==="U"||d==="L";}
 function bw(){return num(S.profile.weight)||90;}
-function thumb(e){return e&&e.ek&&e.ek.length?e.ek[1]:e&&e.gal&&e.gal.length?e.gal[0].src:"";}
+function thumb(e){if(!e)return "";var m=(e.media||[])[0];if(m)return m.t==="v"?m.poster:m.src;return e.ek&&e.ek.length?e.ek[1]:e.gal&&e.gal.length?e.gal[0].src:"";}
+function shown(it){return it.altKey&&EX[it.altKey]?EX[it.altKey]:EX[it.k];}
 function img(src,cls){return src?'<img class="'+(cls||"")+'" src="'+src+'" alt="" loading="lazy">':'<span class="ph0 '+(cls||"")+'">🏋️</span>';}
 function chip(d,v){return '<span class="chip" style="--c:'+DAY_COLOR[d]+'">'+esc(DAYS[d].t)+(v&&hasB(d)?" "+v:"")+'</span>';}
 function nextVar(d){if(!hasB(d))return "A";var l=done().find(function(x){return x.day===d;});return l&&l.v==="A"?"B":l?"A":"A";}
@@ -236,24 +237,31 @@ function demoHTML(e){
 }
 function exDetail(e,it){
   var h='';
-  if(e.ek&&e.ek.length)h+=demoHTML(e);
+  var sl=[];
+  (e.media||[]).filter(function(m){return m.t==="v";}).forEach(function(m){sl.push('<figure class="slide"><span class="badge">🎥 فيديو حقيقي</span><video src="'+m.src+'" poster="'+m.poster+'" muted loop playsinline autoplay preload="metadata"></video><figcaption>'+esc(m.cr)+'</figcaption></figure>');});
+  if(e.ek&&e.ek.length)sl.push('<figure class="slide"><span class="badge">🎬 الحركة الصح</span>'+demoHTML(e)+'<figcaption>Everkinetic · CC BY-SA</figcaption></figure>');
+  (e.media||[]).filter(function(m){return m.t==="p";}).forEach(function(m){sl.push('<figure class="slide"><span class="badge">📷 صورة'+(m.ai?' (رسم)':'')+'</span><img src="'+m.src+'" alt="" loading="lazy" data-act="view" data-src="'+m.src+'" data-cap="'+esc(e.n)+'"><figcaption>'+esc(m.cr)+'</figcaption></figure>');});
+  if(sl.length)h+='<div class="media">'+sl.join("")+'</div>'+(sl.length>1?'<div class="swipe">⇠ اسحب للمزيد ('+sl.length+')</div>':'');
   if(e.prim&&e.prim.length)h+='<div class="musrow">'+bodySVG(e.prim,e.sec||[])+'<div class="leg"><b>العضلات</b><div><i style="background:var(--lime)"></i>أساسية: '+e.prim.map(function(m){return MUS[m];}).join("، ")+'</div>'+((e.sec||[]).length?'<div><i style="background:#ff9a5c"></i>مساعدة: '+e.sec.map(function(m){return MUS[m];}).join("، ")+'</div>':'')+'</div></div>';
   if(e.mach&&e.mach.length)h+='<div class="mlabel">📍 جهازك في أوميغا</div><div class="gal mach">'+e.mach.map(function(k){var m=MACH[k];return m?'<figure><img src="'+m.src+'" alt="" loading="lazy" data-act="view" data-src="'+m.src+'" data-cap="'+esc(m.n)+'"><figcaption>'+esc(m.n)+'</figcaption></figure>':'';}).join("")+'</div>';
   if((!e.ek||!e.ek.length)&&e.gal&&e.gal.length)h+='<div class="gal">'+e.gal.map(function(g){return '<figure><img src="'+g.src+'" alt="" loading="lazy" data-act="view" data-src="'+g.src+'" data-cap="'+esc(g.cap)+'"><figcaption>'+esc(g.cap)+(g.cr?'<small>'+esc(g.cr)+'</small>':'')+'</figcaption></figure>';}).join("")+'</div>';
   if(e.gym)h+='<div class="gym"><b>في أوميغا:</b> '+esc(e.gym)+'</div>';
   h+='<div class="how"><b>إزاي تعمله</b><ol>'+e.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ol></div>';
   if(e.cues&&e.cues.length)h+='<div class="cues"><b>⚠ خلي بالك</b><ul>'+e.cues.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div>';
-  if(e.alt.length)h+='<div class="alts"><b style="color:var(--blue)">لو الجهاز مشغول:</b> '+e.alt.map(esc).join(" · ")+'</div>'+(it?'<label class="altchk"><input type="checkbox" data-act="alt" data-k="'+it.k+'"'+(it.alt?" checked":"")+'> عملت بديل</label>':'');
+  var al=(e.alts||[]).filter(function(k){return EX[k];});
+  if(al.length)h+='<div class="mlabel">🔁 بدايل بنفس التأثير (لو الجهاز مشغول)</div><div class="alts2">'+al.map(function(k){var a=EX[k],th=thumb(a);return '<button type="button" class="altc" data-act="altview" data-k="'+k+'" data-for="'+(it?it.k:"")+'">'+(th?'<img src="'+th+'" alt="" loading="lazy">':'<span class="ph0">🏋️</span>')+'<span>'+esc(a.n)+((a.media||[]).some(function(m){return m.t==="v";})?' <small>🎥</small>':'')+'</span></button>';}).join("")+'</div>';
+  else if(e.alt&&e.alt.length)h+='<div class="alts"><b style="color:var(--blue)">لو الجهاز مشغول:</b> '+e.alt.map(esc).join(" · ")+'</div>';
   return h;
 }
 function vEx(s,it,i){
-  var e=EX[it.k],open=S.open===it.k,cnt=it.sets.filter(function(x){return x.done;}).length,dn=cnt===it.sets.length&&cnt>0;
+  var e=shown(it),open=S.open===it.k,cnt=it.sets.filter(function(x){return x.done;}).length,dn=cnt===it.sets.length&&cnt>0;
   var h='<div class="ex'+(dn?" done":"")+(it.skipped?" skip":"")+'" id="ex-'+it.k+'"><button class="exh" data-act="toggle" data-k="'+it.k+'" aria-expanded="'+open+'">'+img(thumb(e))+
     '<span><span class="nm">'+(i+1)+'. '+esc(e.n)+'</span><br><span class="tg"><b><span class="n">'+it.sets.length+'</span> × '+rng(repsOf(e,s.week))+'</b> · راحة <span class="n">'+e.rest+'</span>ث · '+esc(musText(e))+'</span></span>'+
     '<span class="state">'+(dn?"✓":it.skipped?"–":'<span class="n">'+cnt+'/'+it.sets.length+'</span>')+'</span></button>';
   if(open){
     var last=lastSets(it.k,s.startedAt),noW=e.kind!=="w"||(e.kind==="w"&&it.alt&&/وزن جسمك/.test(e.alt[0]||""));
     h+='<div class="exb">';
+    if(it.altKey)h+='<div class="altbar">🔁 بتعمل بديل لـ <b>'+esc(EX[it.k].n)+'</b> <button type="button" data-act="unalt" data-k="'+it.k+'">رجّع الأساسي</button></div>';
     h+=exDetail(e,it);
     if(last)h+='<div class="last">آخر مرة ('+esc(fmtDate(last.t,{day:"numeric",month:"short"}))+'): '+last.sets.map(function(x){return (num(x.w)?'<span class="n">'+esc(x.w)+'</span>×':'')+'<span class="n">'+esc(x.r)+'</span>';}).join(" · ")+'</div>';
     h+='<div class="sets"><div class="hdr"><span>#</span><span>'+(noW?"":"كجم")+'</span><span>'+(e.kind==="time"?"ثواني":"عدّات")+'</span><span></span></div>';
@@ -277,7 +285,7 @@ function vReport(){
   if(num(s.pre.sys))h+='<div class="card"><h3>الضغط قبل التمرين</h3><p><span class="n" style="font-size:26px">'+esc(s.pre.sys)+'/'+esc(s.pre.dia)+'</span> '+(num(s.pre.pulse)?'· نبض <span class="n">'+esc(s.pre.pulse)+'</span>':'')+'</p></div>';
   h+='<div class="card"><h3>التمارين</h3><table><tr><th>التمرين</th><th>المجموعات</th><th></th></tr>'+(s.items||[]).map(function(it){var e=EX[it.k];var ds=it.sets.filter(function(x){return x.done;});var b=m.best[it.k]||0;var pb=bestBefore(it.k,s.startedAt);
     var tag=it.skipped?'<span class="muted">اتخطّى</span>':(b&&!it.alt&&e.kind==="w"&&b>pb&&pb>0)?'<span class="pr">🏆 رقم جديد</span>':(b&&pb===0&&!it.alt)?'<span class="muted">أول مرة</span>':'';
-    return '<tr><td>'+esc(e.n)+(it.alt?' <span class="muted small">(بديل)</span>':'')+'</td><td>'+(ds.length?ds.map(function(x){return (num(x.w)?'<span class="n">'+esc(x.w)+'</span>×':'')+'<span class="n">'+esc(x.r)+'</span>';}).join(" · "):'—')+'</td><td>'+tag+'</td></tr>';}).join("")+'</table></div>';
+    return '<tr><td>'+esc(shown(it).n)+(it.alt?' <span class="muted small">(بديل)</span>':'')+'</td><td>'+(ds.length?ds.map(function(x){return (num(x.w)?'<span class="n">'+esc(x.w)+'</span>×':'')+'<span class="n">'+esc(x.r)+'</span>';}).join(" · "):'—')+'</td><td>'+tag+'</td></tr>';}).join("")+'</table></div>';
   if(s.post.feel!=null||s.post.note||s.post.back)h+='<div class="card"><h3>بعد التمرين</h3><p>'+(s.post.feel!=null?FEEL[s.post.feel][0]+' '+FEEL[s.post.feel][1]+' · ':'')+'وجع الضهر <span class="n">'+esc(s.post.back||0)+'</span> · الرقبة <span class="n">'+esc(s.post.neck||0)+'</span></p>'+(s.post.note?'<p class="muted">'+esc(s.post.note)+'</p>':'')+'</div>';
   h+=(S.confirm==="del"?'<div class="alert red">تمسح التمرين ده نهائي؟<div class="row" style="margin-top:8px"><button class="danger" data-act="del-yes">امسح</button><button data-act="cancel-no">لأ</button></div></div>':'<button class="ghost danger" data-act="del">مسح التمرين ده</button>');
   return h;
@@ -338,6 +346,10 @@ document.addEventListener("click",function(ev){
   if(a==="dpause"){var dm=b.closest(".demo");dm.classList.toggle("paused");b.textContent=dm.classList.contains("paused")?"▶ تشغيل":"⏸ إيقاف";return;}
   if(a==="dslow"){var dm2=b.closest(".demo");dm2.classList.toggle("slow");b.textContent=dm2.classList.contains("slow")?"🐇 عادي":"🐢 أبطأ";return;}
   if(a==="demo"){return;}
+  if(a==="altview"){openSheet(b.dataset.k,b.dataset.for);return;}
+  if(a==="sheetx"){closeSheet();return;}
+  if(a==="usealt"){var s3=active();var it3=s3&&s3.items.find(function(x){return x.k===b.dataset.for;});if(it3){it3.altKey=b.dataset.k;it3.alt=true;save();}closeSheet();render();var el3=document.getElementById("ex-"+b.dataset.for);if(el3)el3.scrollIntoView({block:"start"});return;}
+  if(a==="unalt"){var s4=active();var it4=s4&&s4.items.find(function(x){return x.k===b.dataset.k;});if(it4){it4.altKey=null;it4.alt=false;save();render();}return;}
   if(a==="view"){$("#viewer-img").src=b.dataset.src;$("#viewer-cap").textContent=b.dataset.cap||"";$("#viewer").hidden=false;return;}
   if(a==="addw"){var v=num($("#wIn").value);if(v>30&&v<300){S.profile.weight=v;S.profile.wlog.push({t:Date.now(),kg:v});save();render();}return;}
   if(a==="addbp"){var x=num($("#bS").value),y=num($("#bD").value);if(x>60&&y>30){S.profile.bp.push({t:Date.now(),s:x,d:y,p:num($("#bP").value)});save();render();}return;}
@@ -380,6 +392,11 @@ document.addEventListener("input",function(ev){var t=ev.target,f=t.dataset.f;if(
 });
 $("#viewer").addEventListener("click",function(){$("#viewer").hidden=true;});
 
+function openSheet(k,forK){var e=EX[k];if(!e)return;var s=active();
+  var h='<div class="sheet-h"><div><h2>'+esc(e.n)+'</h2><span class="small muted">'+esc(e.en)+' · <b style="color:var(--lime)">'+e.sets+' × '+rng(e.reps)+'</b></span></div><button type="button" class="sx" data-act="sheetx">✕</button></div>'+exDetail(e,null);
+  if(s&&forK&&S.view==="workout")h+='<button class="primary big" data-act="usealt" data-k="'+k+'" data-for="'+forK+'">✓ هعمل البديل ده</button>';
+  var sh=$("#sheet");sh.querySelector(".sheet-b").innerHTML=h;sh.hidden=false;sh.querySelector(".sheet-b").scrollTop=0;}
+function closeSheet(){var sh=$("#sheet");sh.hidden=true;sh.querySelector(".sheet-b").innerHTML="";}
 function exportData(){
   var blob=new Blob([JSON.stringify({app:"ahmed-gym",v:1,exported:new Date().toISOString(),sessions:S.sessions,profile:S.profile},null,1)],{type:"application/json"});
   var name="gym-backup-"+new Date().toISOString().slice(0,10)+".json";
