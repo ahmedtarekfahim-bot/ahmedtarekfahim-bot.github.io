@@ -46,5 +46,17 @@
         "63:2C:D4:B2:69:40:05:76:36:FA:B0:09:A3:A0:01:24:E8:6B:2A:40:6A:CB:D5:FF:14:92:9E:83:F1:63:6F:0D"
       ]
     }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.ahmedtarekfahimbot.om",
+      "sha256_cert_fingerprints": [
+        "C3:84:BC:52:DB:E2:B1:35:79:3D:51:F1:07:52:AE:38:16:24:5D:58:A9:C8:D3:E7:6D:B6:E3:81:D3:3E:09:33"
+      ]
+    }
   }
 ]
