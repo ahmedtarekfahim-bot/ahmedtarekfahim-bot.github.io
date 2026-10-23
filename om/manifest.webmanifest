@@ -1,0 +1,38 @@
+{
+  "name": "مرجع التشغيل والصيانة · MEP O&M Academy",
+  "short_name": "O&M Academy",
+  "description": "مرجع عملي للتشغيل والصيانة الإلكتروميكانيكال وإدارة المرافق والصيانة المنزلية، من الصفر للاحتراف",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "/om/",
+  "start_url": "/om/",
+  "scope": "/om/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1422",
+  "theme_color": "#0b1422",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
