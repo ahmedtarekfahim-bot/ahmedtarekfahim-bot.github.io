@@ -234,3 +234,4 @@ code.term:hover,.md code:hover{background:color-mix(in srgb,var(--accent) 22%,tr
 .grid2 input,.card label select,.card label input{width:100%;box-sizing:border-box}
 .card label{display:block;margin:6px 0}
 .ttsbar select{max-width:42vw}
+#setBtn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}

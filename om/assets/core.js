@@ -287,6 +287,7 @@ function renderHome(main) {
   <div class="chips"><span class="chip k">${OM.systems.length} نظام</span><span class="chip k">${nf} عطل بالحل</span><span class="chip k">${nr} اختصار عملي</span><span class="chip k">${nq} سؤال كويز</span><span class="chip">تقدمك: ${total ? Math.round((done / total) * 100) : 0}%</span></div>
   <div class="progressbar" style="margin-top:10px;max-width:420px"><i style="width:${total ? (done / total) * 100 : 0}%"></i></div></section>`;
   h += `<div class="call info" style="margin-top:16px"><div>لو بادئ من الصفر ابدأ بـ <a href="#/path">مسار التعلم</a>. اقرا كل تاب للآخر واضغط "خلصت القراءة" عشان تقدمك يتسجل.<span class="kbdhint"> اضغط <span class="kbd">Ctrl</span>+<span class="kbd">K</span> عشان تبحث في كل المحتوى.</span></div></div>`;
+  if (!AI.has()) h += `<div class="call tip" style="margin-top:10px"><div>🎙️ <b>عايز صوت مصري طبيعي ومساعد يجاوبك من النت؟</b> افتح <a href="#/settings">⚙️ الإعدادات</a> (الزرار اللي فوق جنب ◐) وحط مفتاح Gemini أو ChatGPT.</div></div>`;
   for (const [g, ic, name] of OM.groups) {
     const list = OM.systems.filter((s) => s.group === g);
     if (!list.length) continue;
