@@ -12,6 +12,24 @@ const AI = {
   GVOICES: [["Sulafat", "سولافات (ست، صوت دافي)"], ["Kore", "كورا (ست، واثقة)"], ["Aoede", "أويدي (ست، خفيفة)"], ["Achird", "أشيرد (راجل، ودود)"], ["Charon", "شارون (راجل، شرح)"], ["Puck", "بَك (راجل، حماسي)"]],
   OVOICES: [["marin", "مارين (ست، أطبع صوت)"], ["cedar", "سيدار (راجل، أطبع صوت)"], ["coral", "كورال (ست)"], ["ash", "آش (راجل)"], ["sage", "سيج (ست هادية)"], ["verse", "ڤيرس (راجل)"]],
 
+  /* لو الموديل المختار مزحوم (503) أو مش موجود بنجرّب اللي بعده */
+  GTEXT_ALT: ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite"],
+  GTTS_ALT: ["gemini-3.8-flash-lite-tts", "gemini-3.1-flash-tts-preview"],
+  busy: (r) => [429, 500, 502, 503, 504].includes(r.status) && !/quota|billing|exceeded your/i.test(r.text || ""),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  /* يجرّب الطلب على الموديل المختار، ولو مزحوم يعيد مرة ويجرّب البدائل */
+  async withModels(models, call) {
+    const list = [...new Set(models)];
+    let first = null;
+    for (let i = 0; i < list.length; i++) {
+      let r = await call(list[i]);
+      if (!r.ok && i === 0 && this.busy(r)) { await this.sleep(1500); r = await call(list[i]); }
+      if (r.ok) { r.model = list[i]; return r; }
+      first = first || r;
+      if (!this.busy(r) && r.status !== 404) return first; // المفتاح غلط مثلاً: مفيش داعي نكمّل
+    }
+    return first;
+  },
   cfg() { return Object.assign({}, this.DEF, Store.data.ai || {}); },
   save(patch) { Store.data.ai = Object.assign(this.cfg(), patch); Store.save(); },
   has() { const c = this.cfg(); return !!(c.gkey || c.okey); },
@@ -42,6 +60,7 @@ const AI = {
     if (r.status === 0) return "مقدرتش أوصل للخدمة: يا إما مفيش نت، يا إما المفتاح غلط (OpenAI بيرفض الاتصال من غير ما يقول السبب لو المفتاح غلط).";
     if (r.status === 401 || r.status === 403 || /api key not valid|invalid api key|incorrect api key/i.test(m)) return "المفتاح غلط أو مش مفعّل للخدمة دي. راجع إنك نسخته كامل. (" + m + ")";
     if (r.status === 404) return "اسم الموديل مش موجود أو اتغيّر: غيّره من الإعدادات المتقدمة. (" + m + ")";
+    if (r.status === 503 || r.status === 500 || r.status === 502 || r.status === 504) return "سيرفرات الخدمة عليها ضغط دلوقتي (المفتاح سليم). جرّبت الموديلات البديلة كمان، استنى دقيقة وجرّب تاني.";
     if (r.status === 429) return "وصلت للحد المسموح (كوتة أو رصيد). استنى شوية أو راجع الحساب. " + m;
     return "خطأ " + r.status + ": " + (m || (r.text || "").slice(0, 200));
   },
@@ -55,14 +74,16 @@ const AI = {
   },
   async gemText(prompt, web) {
     const c = this.cfg(), h = { "x-goog-api-key": c.gkey };
-    const r = await this.req("POST", "https://generativelanguage.googleapis.com/v1beta/interactions", h,
-      Object.assign({ model: c.gText, input: prompt }, web ? { tools: [{ type: "google_search" }] } : {}));
-    if (r.ok) return this.parseG(JSON.parse(r.text));
-    if (r.status === 400 || r.status === 404) { // الواجهة القديمة generateContent
-      const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${c.gText}:generateContent`, h,
+    const r = await this.withModels([c.gText, ...this.GTEXT_ALT], async (m) => {
+      const r1 = await this.req("POST", "https://generativelanguage.googleapis.com/v1beta/interactions", h,
+        Object.assign({ model: m, input: prompt }, web ? { tools: [{ type: "google_search" }] } : {}));
+      if (r1.ok || !(r1.status === 400 || r1.status === 404)) return r1;
+      // الواجهة القديمة generateContent
+      const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, h,
         Object.assign({ contents: [{ parts: [{ text: prompt }] }] }, web ? { tools: [{ google_search: {} }] } : {}));
-      if (r2.ok) return this.parseG(JSON.parse(r2.text));
-    }
+      return r2.ok ? r2 : r1;
+    });
+    if (r && r.ok) return Object.assign(this.parseG(JSON.parse(r.text)), { model: r.model });
     throw new Error(this.err(r));
   },
   parseG(j) {
@@ -107,20 +128,21 @@ const AI = {
       out = { b64: r.b64, type: "audio/mpeg" };
     } else {
       const h = { "x-goog-api-key": c.gkey };
-      let r = await this.req("POST", "https://generativelanguage.googleapis.com/v1beta/interactions", h, {
-        model: c.gTts,
-        input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: this.STYLE + pace }] }] }],
-        response_format: { type: "audio" },
-        generation_config: { speech_config: [{ voice }] },
-      });
-      if (!r.ok && (r.status === 400 || r.status === 404)) {
-        const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${c.gTts}:generateContent`, h, {
+      const r = await this.withModels([c.gTts, ...this.GTTS_ALT], async (m) => {
+        const r1 = await this.req("POST", "https://generativelanguage.googleapis.com/v1beta/interactions", h, {
+          model: m,
+          input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: this.STYLE + pace }] }] }],
+          response_format: { type: "audio" },
+          generation_config: { speech_config: [{ voice }] },
+        });
+        if (r1.ok || !(r1.status === 400 || r1.status === 404)) return r1;
+        const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, h, {
           contents: [{ parts: [{ text: this.STYLE + pace + "\n\n" + text }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
         });
-        if (r2.ok) r = r2;
-      }
-      if (!r.ok) throw new Error(this.err(r));
+        return r2.ok ? r2 : r1;
+      });
+      if (!r || !r.ok) throw new Error(this.err(r));
       const a = findAudio(JSON.parse(r.text));
       if (!a) throw new Error("Gemini مارجّعش صوت");
       out = a.b64.startsWith("UklGR") ? { b64: a.b64, type: "audio/wav" } : { b64: pcmToWav(a.b64, a.rate), type: "audio/wav" };
@@ -326,7 +348,7 @@ function renderSettings(main) {
   const test = async (prov, st) => {
     saveKeys(); const s = $(st); s.textContent = "بيجرّب…";
     const keep = AI.cfg().provider; AI.save({ provider: prov });
-    try { const r = await AI.ask("قول جملة واحدة قصيرة بالمصري إن الاتصال تمام.", false); s.innerHTML = `<span style="color:var(--ok)">✓ شغال:</span> ${esc(r.text.slice(0, 160))}`; }
+    try { const r = await AI.ask("قول جملة واحدة قصيرة بالمصري إن الاتصال تمام.", false); s.innerHTML = `<span style="color:var(--ok)">✓ المفتاح شغال${r.model ? " (" + esc(r.model) + ")" : ""}:</span> ${esc(r.text.slice(0, 160))}`; }
     catch (e) { s.innerHTML = `<span style="color:var(--bad)">✗ ${esc(e.message)}</span>`; }
     AI.save({ provider: keep });
   };
