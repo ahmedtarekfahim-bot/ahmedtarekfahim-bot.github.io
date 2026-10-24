@@ -4,7 +4,7 @@
    - كروت تعريف للمصطلحات الملوّنة */
 "use strict";
 const AI = {
-  DEF: { gkey: "", okey: "", provider: "auto", web: true, gText: "gemini-3.8-flash", gTts: "gemini-3.8-flash-tts", oText: "gpt-6-luna", oTts: "gpt-4o-mini-tts" },
+  DEF: { gkey: "", okey: "", provider: "auto", web: true, gText: "gemini-3.6-flash", gTts: "gemini-3.8-flash-tts", oText: "gpt-6-luna", oTts: "gpt-4o-mini-tts" },
   STYLE: "اتكلم بالعامية المصرية الطبيعية (لهجة قاهرية) زي مهندس مصري شاطر بيشرح لصاحبه في الشغل: صوت دافي وحماسي وبسيط وواضح، من غير فصحى خالص، وانطق المصطلحات الإنجليزي زي ما المهندسين المصريين بينطقوها.",
   SYS: "انت مهندس تشغيل وصيانة إلكتروميكانيكال خبير (تكييف وتبريد HVAC، كهرباء وتوزيع، مولدات، UPS وبطاريات، حريق إنذار وإطفاء، صحي وصرف، مصاعد، BMS، معدات دوارة، إدارة مرافق، وصيانة الأجهزة المنزلية). بتشرح لمهندس أو فني عايز يفهم عملي.\n" +
     "- جاوب بالعامية المصرية البسيطة، وسيب المصطلحات والاختصارات بالإنجليزي.\n- ابدأ بالإجابة المباشرة في سطرين، وبعدها التفاصيل العملية: الخطوات، القيم والأرقام الطبيعية، التحذيرات والسلامة، والكود أو الستاندرد لو ليه علاقة.\n" +
@@ -13,9 +13,10 @@ const AI = {
   OVOICES: [["marin", "مارين (ست، أطبع صوت)"], ["cedar", "سيدار (راجل، أطبع صوت)"], ["coral", "كورال (ست)"], ["ash", "آش (راجل)"], ["sage", "سيج (ست هادية)"], ["verse", "ڤيرس (راجل)"]],
 
   /* لو الموديل المختار مزحوم (503) أو مش موجود بنجرّب اللي بعده */
-  GTEXT_ALT: ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite"],
+  GTEXT_ALT: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-flash-lite"],
   GTTS_ALT: ["gemini-3.8-flash-lite-tts", "gemini-3.1-flash-tts-preview"],
-  busy: (r) => [429, 500, 502, 503, 504].includes(r.status) && !/quota|billing|exceeded your/i.test(r.text || ""),
+  busy: (r) => ([429, 500, 502, 503, 504].includes(r.status) && !/quota|billing|exceeded your/i.test(r.text || "")) || (r.status === 0 && /timed? ?out/i.test(r.err || "")),
+  quota: (r) => r && r.status === 429 && /quota|billing|exceeded your/i.test(r.text || ""),
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   /* يجرّب الطلب على الموديل المختار، ولو مزحوم يعيد مرة ويجرّب البدائل */
   async withModels(models, call) {
@@ -30,8 +31,18 @@ const AI = {
     }
     return first;
   },
-  cfg() { return Object.assign({}, this.DEF, Store.data.ai || {}); },
-  save(patch) { Store.data.ai = Object.assign(this.cfg(), patch); Store.save(); },
+  OLD: { gText: ["gemini-3.8-flash"] }, // افتراضيات قديمة اتغيرت
+  cfg() {
+    const c = Object.assign({}, this.DEF, Store.data.ai || {});
+    for (const k in this.OLD) if (this.OLD[k].includes(c[k])) c[k] = this.DEF[k];
+    return c;
+  },
+  /* بنحفظ بس اللي المستخدم غيّره عن الافتراضي، عشان لو الافتراضي اتحسّن يوصله */
+  save(patch) {
+    const c = Object.assign(this.cfg(), patch), keep = {};
+    for (const k in c) if (c[k] !== this.DEF[k]) keep[k] = c[k];
+    Store.data.ai = keep; Store.save();
+  },
   has() { const c = this.cfg(); return !!(c.gkey || c.okey); },
   provider() {
     const c = this.cfg();
@@ -42,21 +53,24 @@ const AI = {
   inApp() { return !!(window.pywebview && pywebview.api && pywebview.api.http); },
 
   /* ---------- الاتصال: جوه البرنامج عن طريق البايثون، وعلى الموبايل fetch مباشرة ---------- */
-  async req(method, url, headers, body, bin) {
+  async req(method, url, headers, body, bin, timeout = 45) {
     if (this.inApp()) {
-      try { return await pywebview.api.http(method, url, JSON.stringify(headers || {}), body ? JSON.stringify(body) : "", !!bin); }
+      try { return await pywebview.api.http(method, url, JSON.stringify(headers || {}), body ? JSON.stringify(body) : "", !!bin, timeout); }
       catch (e) { return { ok: false, status: 0, err: String(e) }; }
     }
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeout * 1000);
     try {
-      const res = await fetch(url, { method, headers: Object.assign({ "Content-Type": "application/json" }, headers || {}), body: body ? JSON.stringify(body) : undefined });
+      const res = await fetch(url, { method, signal: ctl.signal, headers: Object.assign({ "Content-Type": "application/json" }, headers || {}), body: body ? JSON.stringify(body) : undefined });
       const ctype = res.headers.get("content-type") || "";
       if (bin && res.ok && !/json/.test(ctype)) return { ok: true, status: res.status, b64: b64(await res.arrayBuffer()), ctype };
       return { ok: res.ok, status: res.status, text: await res.text(), ctype };
-    } catch (e) { return { ok: false, status: 0, err: String(e) }; }
+    } catch (e) { return { ok: false, status: 0, err: e.name === "AbortError" ? "timed out" : String(e) }; }
+    finally { clearTimeout(tm); }
   },
   err(r) {
     let m = "";
     try { let j = JSON.parse(r.text); if (Array.isArray(j)) j = j[0] || {}; m = (j.error && (j.error.message || j.error)) || ""; } catch (e) { }
+    if (r.status === 0 && /timed? ?out/i.test(r.err || "")) return "الخدمة اتأخرت في الرد (ضغط على سيرفراتها)، وجرّبت الموديلات البديلة. جرّب تاني بعد شوية.";
     if (r.status === 0) return "مقدرتش أوصل للخدمة: يا إما مفيش نت، يا إما المفتاح غلط (OpenAI بيرفض الاتصال من غير ما يقول السبب لو المفتاح غلط).";
     if (r.status === 401 || r.status === 403 || /api key not valid|invalid api key|incorrect api key/i.test(m)) return "المفتاح غلط أو مش مفعّل للخدمة دي. راجع إنك نسخته كامل. (" + m + ")";
     if (r.status === 404) return "اسم الموديل مش موجود أو اتغيّر: غيّره من الإعدادات المتقدمة. (" + m + ")";
@@ -73,18 +87,30 @@ const AI = {
     return p === "gemini" ? this.gemText(prompt, web) : this.oaText(prompt, web);
   },
   async gemText(prompt, web) {
+    if (web) {
+      try { return await this.gemText1(prompt, true); }
+      catch (e) {
+        if (!e.quota) throw e;
+        const r = await this.gemText1(prompt, false);
+        r.note = "البحث في جوجل اترفض بسبب حدود حسابك (محتاج تفعيل Billing في Google AI Studio)، فدي إجابة من معلومات الموديل من غير مصادر.";
+        return r;
+      }
+    }
+    return this.gemText1(prompt, false);
+  },
+  async gemText1(prompt, web) {
     const c = this.cfg(), h = { "x-goog-api-key": c.gkey };
     const r = await this.withModels([c.gText, ...this.GTEXT_ALT], async (m) => {
       const r1 = await this.req("POST", "https://generativelanguage.googleapis.com/v1beta/interactions", h,
-        Object.assign({ model: m, input: prompt }, web ? { tools: [{ type: "google_search" }] } : {}));
+        Object.assign({ model: m, input: prompt }, web ? { tools: [{ type: "google_search" }] } : {}), false, web ? 60 : 40);
       if (r1.ok || !(r1.status === 400 || r1.status === 404)) return r1;
       // الواجهة القديمة generateContent
       const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, h,
-        Object.assign({ contents: [{ parts: [{ text: prompt }] }] }, web ? { tools: [{ google_search: {} }] } : {}));
+        Object.assign({ contents: [{ parts: [{ text: prompt }] }] }, web ? { tools: [{ google_search: {} }] } : {}), false, web ? 60 : 40);
       return r2.ok ? r2 : r1;
     });
     if (r && r.ok) return Object.assign(this.parseG(JSON.parse(r.text)), { model: r.model });
-    throw new Error(this.err(r));
+    throw Object.assign(new Error(this.err(r)), { quota: this.quota(r) });
   },
   parseG(j) {
     let text = ""; const src = [];
@@ -102,7 +128,7 @@ const AI = {
   async oaText(prompt, web) {
     const c = this.cfg();
     const r = await this.req("POST", "https://api.openai.com/v1/responses", { Authorization: "Bearer " + c.okey },
-      Object.assign({ model: c.oText, input: prompt }, web ? { tools: [{ type: "web_search" }] } : {}));
+      Object.assign({ model: c.oText, input: prompt }, web ? { tools: [{ type: "web_search" }] } : {}), false, web ? 90 : 60);
     if (!r.ok) throw new Error(this.err(r));
     const j = JSON.parse(r.text); let text = j.output_text || ""; const src = [];
     (j.output || []).forEach((o) => (o.content || []).forEach((c) => {
@@ -134,7 +160,7 @@ const AI = {
           input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: this.STYLE + pace }] }] }],
           response_format: { type: "audio" },
           generation_config: { speech_config: [{ voice }] },
-        });
+        }, false, 40);
         if (r1.ok || !(r1.status === 400 || r1.status === 404)) return r1;
         const r2 = await this.req("POST", `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, h, {
           contents: [{ parts: [{ text: this.STYLE + pace + "\n\n" + text }] }],
@@ -299,12 +325,12 @@ async function runAI(q) {
     out.innerHTML = `<div class="call info"><div>عشان المساعد يجاوب جوه البرنامج محتاج مفتاح Gemini (فيه مجاني) أو OpenAI. <a href="#/settings">افتح الإعدادات</a> وهتلاقي الخطوات. ولحد ما تضيفه، دوس ChatGPT أو Gemini فوق والسؤال هيتفتح هناك.</div></div>`;
     return;
   }
-  st.textContent = "بيفكر ويدوّر…"; $("#aigo").disabled = true;
+  st.textContent = "بيفكر ويكتب… (ممكن ياخد من 15 لـ 30 ثانية)"; $("#aigo").disabled = true;
   out.innerHTML = `<div class="card"><div class="spinner"></div></div>`;
   try {
     const r = await AI.ask(q, $("#aiweb").checked);
     if (!r.text) throw new Error("مفيش رد");
-    out.innerHTML = `<div class="card aians"><h3>✨ ${esc(q)}</h3>${md(r.text)}${srcHTML(r.src)}<p class="muted small">إجابة ذكاء اصطناعي: راجع الأرقام المهمة مع الكتالوج أو الكود قبل التنفيذ.</p></div>`;
+    out.innerHTML = `<div class="card aians"><h3>✨ ${esc(q)}</h3>${r.note ? `<div class="call info"><div>${esc(r.note)}</div></div>` : ""}${md(r.text)}${srcHTML(r.src)}<p class="muted small">إجابة ذكاء اصطناعي: راجع الأرقام المهمة مع الكتالوج أو الكود قبل التنفيذ.</p></div>`;
     Speech.attach(out, ".aians");
     const hist = Store.data.aiHist || [];
     hist.unshift({ q, a: r.text, src: r.src, d: new Date().toLocaleDateString("ar-EG") });
