@@ -72,8 +72,8 @@ const el = (html) => { const d = document.createElement("div"); d.innerHTML = ht
 
 function inline(t) {
   return String(t)
-    .replace(/`([^`]+)`/g, (m, x) => `<code>${x}</code>`)
-    .replace(/‹([^›]+)›/g, (m, x) => `<code>${x}</code>`)
+    .replace(/`([^`]+)`/g, (m, x) => `<code class="term">${x}</code>`)
+    .replace(/‹([^›]+)›/g, (m, x) => `<code class="term">${x}</code>`)
     .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, (m, a, u) => `<a href="#" data-ext="${esc(u)}">${a}</a>`)
     .replace(/\{\{d:([\w-]+)\}\}/g, (m, n) => diagramHTML(n))
@@ -201,6 +201,8 @@ async function boot() {
     if (f) { e.preventDefault(); openFile(f.dataset.file); return; }
     const z = e.target.closest("[data-zoom]");
     if (z) { modal(`<img src="${z.getAttribute("src")}">` + (z.dataset.cap ? `<p class="muted small">${z.dataset.cap}</p>` : "")); return; }
+    const tg = e.target.closest(".hero .chip:not(.k)");
+    if (tg && window.doSearch) { window.doSearch(tg.textContent.trim()); return; }
     const d = e.target.closest(".diagram svg");
     if (d) modal(`<div class="diagram" style="min-width:70vw">${d.outerHTML}</div>`);
   });
@@ -224,7 +226,9 @@ function renderSide() {
   <a href="#/exam"><span class="ic">🏆</span>الكويزات والاختبارات</a>
   <a href="#/glossary"><span class="ic">🔤</span>قاموس المصطلحات</a>
   ${window.OM_WEB ? "" : `<a href="#/library"><span class="ic">📚</span>مكتبة الكورسات</a>`}
-  <a href="#/fav"><span class="ic">⭐</span>المفضلة وملاحظاتي</a>`;
+  <a href="#/fav"><span class="ic">⭐</span>المفضلة وملاحظاتي</a>
+  <a href="#/ai"><span class="ic">🤖</span>اسأل المساعد الذكي</a>
+  <a href="#/settings"><span class="ic">⚙️</span>الإعدادات: الصوت والذكاء الاصطناعي</a>`;
   for (const [g, ic, name] of OM.groups) {
     const list = OM.systems.filter((s) => s.group === g);
     if (!list.length) continue;
@@ -261,6 +265,8 @@ function route() {
     else if (page === "library") renderLibrary(main);
     else if (page === "fav") renderFav(main);
     else if (page === "path") renderPath(main);
+    else if (page === "ai") renderAI(main, a || "");
+    else if (page === "settings") renderSettings(main);
     else renderHome(main);
   } catch (e) {
     console.error(e);
@@ -312,7 +318,7 @@ function renderSystem(main, s, tab) {
   if (!tab || !tabs.find(([k]) => k === tab)) tab = tabs[0][0];
   const p = sysProgress(s);
   main.innerHTML = `<section class="hero"><h1><span>${s.icon}</span>${s.title} <span class="en">${s.en}</span></h1><p>${inline(s.summary || "")}</p>
-   <div class="chips">${(s.tags || []).map((t) => `<span class="chip">${t}</span>`).join("")}<span class="chip k">قريت ${p.done}/${p.total}</span></div></section>
+   <div class="chips">${(s.tags || []).map((t) => `<span class="chip tag" title="دوّر على ${esc(t)}">${t}</span>`).join("")}<span class="chip k">قريت ${p.done}/${p.total}</span></div></section>
    <div class="tabs">${tabs.map(([k, ic, n]) => `<button class="tab ${k === tab ? "on" : ""}" data-t="${k}">${ic} ${n}${countTab(s, k) ? `<span class="n">${countTab(s, k)}</span>` : ""}${(Store.data.read[s.id] || {})[k] ? " ✓" : ""}</button>`).join("")}</div>
    <div class="pane" id="pane"></div>`;
   main.querySelectorAll(".tab").forEach((b) => (b.onclick = () => (location.hash = `#/sys/${s.id}/${b.dataset.t}`)));
@@ -649,30 +655,120 @@ function buildIndex() {
   OM.rules.forEach((c) => c.items.forEach((r) => add(r.t, r.v + " " + (r.why || "") + " " + (r.ex || ""), "#/rules", "اختصارات › " + c.title)));
   OM.glossary.forEach((t) => add(t[0] + " — " + t[1], t[2], "#/glossary", "القاموس"));
 }
+/* البحث الذكي: توحيد الحروف، مرادفات عامي/إنجليزي، تصحيح الأخطاء الإملائية، واقتراحات وانت بتكتب */
+const normAr = (t) => String(t || "").toLowerCase().replace(/[ً-ْـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي");
+const SYN_RAW = [
+  "تشلر شيلر تشيلر chiller", "كمبروسر كباس ضاغط compressor", "فريون غاز وسيط refrigerant", "طلمبه طرمبه مضخه pump", "مولد جنريتور ماكينه generator genset",
+  "سبليت اسبليت split", "تكييف تكيف مكيف hvac", "مروحه فان fan", "شفاط exhaust", "رشاش رشاشات sprinkler", "حريق fire", "انذار الارم alarm", "دخان smoke", "كاشف ديتكتور detector",
+  "بطاريه بطاريات battery", "يوبي اس يو بي اس ups", "محول ترانس transformer", "موتور ماتور motor", "انفرتر inverter vfd", "مصعد اسانسير elevator lift", "كوبس قاطع بريكر breaker mcb",
+  "ارضي تاريض ارث earthing grounding", "صاعقه lightning", "كابل سلك cable", "لوحه طبلون panel db", "اهتزاز vibration", "محاذاه الاينمنت alignment", "رولمان بلي bearing", "سيل جلنده seal",
+  "مواسير ماسوره pipe", "صرف مجاري drainage", "سباكه plumbing", "سخان heater", "غساله washer", "تلاجه ثلاجه fridge refrigerator", "بوتاجاز موقد stove", "فرن oven", "ميكرويف microwave",
+  "خلاط blender", "مكوه مكواه iron", "تليفزيون شاشه tv", "شمسي طاقه شمسيه solar pv", "فلتر filter", "صمام بلف محبس valve", "ضغط pressure", "حراره temperature", "تيار امبير current",
+  "جهد فولت voltage", "قدره power", "تسريب ليك leak", "تكثيف كوندنسر condenser", "مبخر ايفابوريتور evaporator", "برج تبريد cooling tower", "دكت مجاري هوا duct", "صيانه وقائيه ppm preventive",
+  "ليه سبب why cause", "عطل مشكله fault problem", "مياه مايه ميه water", "سخونه بيسخن بتسخن يسخن سخن حراره overheat overheating",
+  "بيقوم يقوم يدور بيدور بيبدا start starting cranking", "بيفصل يفصل فصل trip tripping", "بيسرب يسرب تسريب leak", "صوت زن خبط noise", "ريحه ريحة smell", "بيهز رعشه اهتزاز vibration",
+];
+const SYN = {};
+SYN_RAW.forEach((g) => { const w = normAr(g).split(/\s+/); w.forEach((x) => (SYN[x] = w.filter((y) => y !== x))); });
+let VOCAB = [];
+function buildVocab() {
+  const m = new Map();
+  SIDX.forEach((x) => { x.n = normAr(x.low); x.nt = normAr(x.title.toLowerCase()); x.n.split(/[^a-z0-9؀-ۿ]+/).forEach((w) => { if (w.length > 2) m.set(w, (m.get(w) || 0) + 1); }); });
+  VOCAB = [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+function editDist(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) cur[j] = Math.min(cur[j], prev[j - 2] + 1);
+      best = Math.min(best, cur[j]);
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+/* أقرب كلمات موجودة في المحتوى لكلمة مكتوبة غلط */
+function fuzzy(w, n = 3) {
+  const max = w.length <= 4 ? 1 : w.length <= 7 ? 2 : 3, out = [];
+  const bare = w.replace(/^(ال|وال|بال|لل)/, "");
+  for (const [v] of VOCAB) {
+    const d = Math.min(editDist(w, v, max), bare !== w ? editDist(bare, v.replace(/^(ال|وال|بال|لل)/, ""), max) : 9);
+    if (d <= max) out.push([v, d]);
+  }
+  return out.sort((a, b) => a[1] - b[1]).slice(0, n).map((x) => x[0]);
+}
+function searchCore(q) {
+  const words = normAr(q).split(/\s+/).filter((w) => w.length > 1);
+  if (!words.length) return { res: [], words: [], fixed: null, partial: false };
+  let fixed = null;
+  // لكل كلمة: نفسها + مرادفاتها + (لو مش موجودة خالص) أقرب كلمات ليها
+  const alts = words.map((w) => {
+    const list = [[w, 3]];
+    (SYN[w] || SYN[w.replace(/^ال/, "")] || []).forEach((x) => list.push([x, 2]));
+    if (!SIDX.some((x) => x.n.includes(w)) && !(SYN[w] || []).length) {
+      const f = fuzzy(w);
+      f.forEach((x) => list.push([x, 1]));
+      if (f.length) { fixed = fixed || words.slice(); fixed[words.indexOf(w)] = f[0]; }
+    }
+    return list;
+  });
+  const N = SIDX.length, idf = {};
+  alts.flat().forEach(([t]) => { if (!(t in idf)) { const df = SIDX.reduce((n, x) => n + (x.n.includes(t) ? 1 : 0), 0); idf[t] = Math.log(1 + N / (1 + df)); } });
+  const scored = SIDX.map((x) => {
+    let hit = 0, sc = 0;
+    alts.forEach((list) => {
+      let best = 0;
+      for (const [t, wgt] of list) { if (x.n.includes(t)) best = Math.max(best, wgt * idf[t] * (x.nt.includes(t) ? 4 : 1)); }
+      if (best) { hit++; sc += best; }
+    });
+    return hit ? { x, hit, sc } : null;
+  }).filter(Boolean);
+  const all = scored.filter((r) => r.hit === words.length);
+  const partial = !all.length && words.length > 1;
+  const res = (all.length ? all : scored.filter((r) => r.hit === Math.max(...scored.map((z) => z.hit))))
+    .sort((a, b) => b.sc - a.sc).slice(0, 40);
+  return { res, words, terms: alts.flat().map((x) => x[0]), fixed: fixed && fixed.join(" "), partial };
+}
 function setupSearch() {
   const inp = $("#q"), box = $("#results");
+  buildVocab();
   let sel = -1;
-  const norm = (t) => t.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
   const run = () => {
     const q = inp.value.trim();
     if (q.length < 2) { box.hidden = true; return; }
-    const words = norm(q).split(/\s+/);
-    const res = SIDX.map((x) => {
-      const L = norm(x.low), T = norm(x.title.toLowerCase());
-      if (!words.every((w) => L.includes(w))) return null;
-      return { x, sc: words.reduce((n, w) => n + (T.includes(w) ? 5 : 1), 0) };
-    }).filter(Boolean).sort((a, b) => b.sc - a.sc).slice(0, 40);
-    const hl = (t) => { let s = esc(t); words.forEach((w) => { if (w.length > 1) s = s.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`); }); return s; };
-    box.innerHTML = res.length ? res.map((r, i) => {
-      const b = r.x.body, L = norm(b.toLowerCase()), p = Math.max(0, L.indexOf(words[0]) - 50);
+    const { res, words, terms, fixed, partial } = searchCore(q);
+    const hl = (t) => { let s = esc(t); terms.filter((w) => w.length > 1).forEach((w) => { s = s.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`); }); return s; };
+    // اقتراحات: إكمال آخر كلمة + أنظمة اسمها قريب
+    const last = words[words.length - 1] || "";
+    const comp = last.length > 1 ? VOCAB.filter(([v]) => v.startsWith(last) && v !== last).slice(0, 6).map(([v]) => v) : [];
+    const sys = OM.systems.filter((s) => terms.some((t) => normAr(s.title + " " + s.en).includes(t))).slice(0, 4);
+    let h = "";
+    if (fixed && normAr(fixed) !== normAr(q)) h += `<div class="r sugg">🔤 قصدك: <a href="#" data-fix="${esc(fixed)}"><b>${esc(fixed)}</b></a>؟</div>`;
+    if (comp.length || sys.length) h += `<div class="r chipsrow">${sys.map((s) => `<a class="chip k" href="#/sys/${s.id}">${s.icon} ${esc(s.title)}</a>`).join("")}${comp.map((c) => `<a class="chip" href="#" data-comp="${esc(c)}">${esc(c)}…</a>`).join("")}</div>`;
+    if (partial && res.length) h += `<div class="r muted small">مفيش نتيجة فيها كل الكلمات، دي أقرب حاجة:</div>`;
+    h += res.map((r) => {
+      const b = r.x.body, L = normAr(b.toLowerCase()), first = terms.find((t) => L.includes(t)) || words[0], p = Math.max(0, L.indexOf(first) - 50);
       return `<div class="r" data-l="${r.x.link}">${hl(r.x.title)}<small>${esc(r.x.where)} — ${hl(b.slice(p, p + 140))}…</small></div>`;
-    }).join("") : `<div class="r muted">مفيش نتايج</div>`;
+    }).join("");
+    if (!res.length) h += `<div class="r muted">مالقتش حاجة في البرنامج عن «${esc(q)}».</div>`;
+    h += `<div class="r ask" data-ai="${esc(q)}">✨ اسأل المساعد الذكي: «${esc(q)}» ${AI.provider() ? "" : '<span class="muted small">(محتاج مفتاح أو يفتح في ChatGPT)</span>'}</div>`;
+    box.innerHTML = h;
     box.hidden = false; sel = -1;
     box.querySelectorAll(".r[data-l]").forEach((r) => (r.onclick = () => { location.hash = r.dataset.l; box.hidden = true; }));
+    box.querySelectorAll("[data-fix]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); inp.value = a.dataset.fix; run(); inp.focus(); }));
+    box.querySelectorAll("[data-comp]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); const w = inp.value.trim().split(/\s+/); w[w.length - 1] = a.dataset.comp; inp.value = w.join(" ") + " "; run(); inp.focus(); }));
+    box.querySelectorAll(".chipsrow a[href^='#/sys']").forEach((a) => (a.onclick = () => (box.hidden = true)));
+    box.querySelector("[data-ai]").onclick = () => { box.hidden = true; location.hash = "#/ai/" + encodeURIComponent(q); };
   };
-  let tm; inp.oninput = () => { clearTimeout(tm); tm = setTimeout(run, 120); };
+  window.doSearch = (q) => { inp.value = q; inp.focus(); run(); window.scrollTo(0, 0); };
+  let tm; inp.oninput = () => { clearTimeout(tm); tm = setTimeout(run, 140); };
+  inp.onfocus = () => { if (inp.value.trim().length > 1) run(); };
   inp.onkeydown = (e) => {
-    const rs = [...box.querySelectorAll(".r[data-l]")];
+    const rs = [...box.querySelectorAll(".r[data-l], .r[data-ai]")];
     if (e.key === "ArrowDown") { sel = Math.min(sel + 1, rs.length - 1); }
     else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); }
     else if (e.key === "Enter" && rs[sel >= 0 ? sel : 0]) { rs[sel >= 0 ? sel : 0].click(); return; }
