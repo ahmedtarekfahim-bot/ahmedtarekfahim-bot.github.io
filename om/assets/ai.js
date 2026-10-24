@@ -342,7 +342,7 @@ function renderSettings(main) {
   </div>`;
   main.querySelectorAll("[data-eye]").forEach((b) => (b.onclick = () => { const i = $("#" + b.dataset.eye); i.type = i.type === "password" ? "text" : "password"; }));
   const saveKeys = () => { AI.save({ gkey: $("#gkey").value.trim(), okey: $("#okey").value.trim() }); fillVoices(); $("#segy").hidden = !$("#gkey").value.trim(); };
-  $("#gkey").onchange = saveKeys; $("#okey").onchange = saveKeys;
+  ["#gkey", "#okey"].forEach((k) => { $(k).onchange = saveKeys; $(k).oninput = () => { if ($(k).value.trim().length > 20) saveKeys(); }; });
   $("#sprov").value = c.provider; $("#sprov").onchange = (e) => AI.save({ provider: e.target.value });
   main.querySelectorAll("[data-m]").forEach((i) => (i.onchange = () => AI.save({ [i.dataset.m]: i.value.trim() || AI.DEF[i.dataset.m] })));
   const test = async (prov, st) => {
