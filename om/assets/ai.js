@@ -301,8 +301,8 @@ function renderSettings(main) {
   <div class="pane">
    <div class="card"><h3>✨ Gemini (من Google)</h3>
     <p class="small">صوته بيدعم العربي المصري، وفيه حد استخدام مجاني للإجابات والبحث في النت. <b>اشتراك Gemini العادي مش هو المفتاح</b>، المفتاح بيطلع من Google AI Studio:</p>
-    <ol class="small"><li>افتح <a href="#" data-ext="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> بحسابك.</li><li>دوس <b>Create API key</b> وانسخه.</li><li>الصقه هنا ودوس "جرّب".</li></ol>
-    <div class="toolbar"><input type="password" id="gkey" placeholder="AIza…" value="${esc(c.gkey)}" style="flex:1" autocomplete="off"><button class="btn ghost" data-eye="gkey">👁️</button><button class="btn" id="gtest">جرّب</button></div><div class="small" id="gst"></div></div>
+    <ol class="small"><li>افتح <a href="#" data-ext="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> بحسابك.</li><li>دوس <b>Create API key</b> (أو افتح المفتاح الموجود) ودوس <b>Copy key</b>. المفتاح بيبدأ بـ AQ. أو AIza.</li><li>الصقه هنا ودوس "جرّب".</li></ol>
+    <div class="toolbar"><input type="password" id="gkey" placeholder="AQ.… أو AIza…" value="${esc(c.gkey)}" style="flex:1" autocomplete="off"><button class="btn ghost" data-eye="gkey">👁️</button><button class="btn" id="gtest">جرّب</button></div><div class="small" id="gst"></div></div>
    <div class="card"><h3>🤖 OpenAI (صوت ChatGPT)</h3>
     <p class="small">نفس نوعية أصوات ChatGPT (مارين وسيدار أطبع صوتين)، وبتتكلم مصري بالتعليمات. <b>اشتراك ChatGPT Plus مش هو المفتاح</b>، الـ API بيتحاسب لوحده بالاستخدام (بيبقى سنتات قليلة):</p>
     <ol class="small"><li>افتح <a href="#" data-ext="https://platform.openai.com/api-keys">platform.openai.com/api-keys</a> واشحن رصيد صغير من Billing.</li><li>دوس <b>Create new secret key</b> وانسخه.</li><li>الصقه هنا ودوس "جرّب".</li></ol>
