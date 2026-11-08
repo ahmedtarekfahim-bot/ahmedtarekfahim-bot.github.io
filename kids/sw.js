@@ -1,7 +1,7 @@
 ﻿/* offline cache: the app is cached on first open; recorded voices are kept in their own cache */
-var V = "kids-v4";
+var V = "kids-v5";
 var AUDIO = "kids-audio";
-var SHELL = ["./", "index.html", "style.css?v=4", "app.js?v=4", "data.js?v=4", "manifest.webmanifest", "audio/index.json", "fonts/fredoka.woff2", "fonts/baloo-ar.woff2", "icons/icon-192.png", "icons/icon-512.png"];
+var SHELL = ["./", "index.html", "style.css?v=5", "app.js?v=5", "data.js?v=5", "articles.js?v=5", "manifest.webmanifest", "audio/index.json", "fonts/fredoka.woff2", "fonts/baloo-ar.woff2", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
 });

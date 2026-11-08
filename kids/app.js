@@ -4,7 +4,7 @@
 
   /* ---------- storage ---------- */
   var KEY = "super-kid-v1";
-  var APP_V = "4";
+  var APP_V = "5";
   var DEF = {
     name: "", rate: 0.85, voice: "", voiceSet: "en1", reps: 2, gap: 3, auto: true, ar: false, sfx: true,
     gameCats: [], stars: 0, played: 0, best: {}, learned: {},
@@ -216,7 +216,8 @@
   window.addEventListener("hashchange", route);
   $("#back").addEventListener("click", function () { SFX.tap(); location.hash = parent(location.hash); });
   function parent(h) {
-    var p = h.replace(/^#/, "").split("/");
+    var p = h.replace(/^#/, "").split("?")[0].split("/");
+    if (p[0] === "artlearn" || p[0] === "artq" || p[0] === "artgame") return "#art";
     if (p[0] === "cat" || p[0] === "play" && p[1] === "w") return "#words";
     if (p[0] === "grp" || p[0] === "play" && p[1] === "s") return "#sent";
     if (p[0] === "verb" || p[0] === "play" && p[1] === "v") return "#verbs";
@@ -240,7 +241,7 @@
   function route() {
     PL.run++; G.run++; hush(); stopRec();
     pbar("");
-    var p = (location.hash || "#home").replace(/^#/, "").split("/");
+    var p = (location.hash || "#home").replace(/^#/, "").split("?")[0].split("/");
     window.scrollTo(0, 0);
     var r = R[p[0]] || R.home;
     r.apply(null, p.slice(1).map(decodeURIComponent));
@@ -278,6 +279,7 @@
       tile("#verbs", "🏃", "Verbs", "الأفعال والأزمنة", "#ff5fa2", V.length) +
       tile("#sent", "💬", "Sentences", "الجمل", "#2ec4b6", SENT.reduce(function (a, g) { return a + g.s.length; }, 0)) +
       tile("#games", "🎮", "Games", "الألعاب", "#6c4cff") +
+      tile("#art", "🅰️", "A, An, The", "أدوات a / an / the", "#ef5350", ART.sentences.length) +
       tile("#math", "🧮", "Math", "الرياضيات", "#00a8e8") +
       tile("#me", "⭐", "My Stars", "نجومي وملصقاتي", "#ffb300") +
       "</div>" +
@@ -285,7 +287,7 @@
       '<button class="line" data-a="say" data-t="' + esc(wod.en) + '" data-ar="' + esc(wod.ar) + '">' + emo(wod.em) +
       '<span class="tx"><span class="en">' + esc(wod.en) + '</span><span class="ar">' + esc(wod.ar) + '</span></span><span class="play">🔊</span></button>' +
       '<div class="row" style="margin-top:18px"><button class="btn white big" data-a="go" data-h="#settings">⚙️ <span class="ar">الإعدادات: الصوت والتكرار</span></button></div>' +
-      '<p class="note ar" style="text-align:center;margin-top:14px">نسخة ' + APP_V + " · 🔊 أصوات معلّمة متسجّلة</p>";
+      '<p class="note ar" style="text-align:center;margin-top:14px">نسخة ' + APP_V + " · 🅰️ جديد: قسم A, An, The</p>";
   };
   function tile(h, ic, t1, t2, color, cnt) {
     return '<button class="tile" style="background:' + color + '" data-a="go" data-h="' + h + '">' + (cnt ? '<span class="cnt">' + cnt + "</span>" : "") +
@@ -872,6 +874,147 @@
     if (!alive()) return;
     G.i++; if (G.i >= G.n) finish(); else drawMath();
   };
+
+  /* ---------- articles: a / an / the ---------- */
+  function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+  function artFill(s, ans) { return s.replace("___", s.indexOf("___") === 0 ? cap(ans) : ans); }
+  function artAlive() { return location.hash.indexOf("#art") === 0; }
+  R.art = function () {
+    head("A, An, The", "أدوات a / an / the", true);
+    var items = [
+      ["#artlearn", "📖", "The Rules", "القاعدة بالأمثلة: إمتى a وإمتى an وإمتى the", "#ff8a3d"],
+      ["#artq/practice", "✏️", "Circle the best article", "تمرين: اختار الأداة الصح، والشرح بيظهر بعد كل جملة", "#2ec4b6"],
+      ["#artgame", "🎈", "a or an? Speed game", "لعبة سريعة: a ولا an؟ عندك دقيقة واحدة", "#ff5fa2"],
+      ["#artq/test", "📝", "Test", "اختبار 20 سؤال، والنتيجة والمراجعة في الآخر", "#6c4cff"]
+    ];
+    app.innerHTML = '<div class="hero" style="margin-bottom:12px"><span class="mascot-sm">🦉</span><div class="bubble"><span class="en"><b>a</b> ball · <b>an</b> apple · <b>the</b> sun</span><br><span class="ar">اتعلّم القاعدة الأول، وبعدين اتمرّن والعب واختبر نفسك</span></div></div>' +
+      '<div class="gamelist">' + items.map(function (g) {
+        var best = S.best[g[0] === "#artgame" ? "art-game" : g[0] === "#artq/test" ? "art-test" : g[0] === "#artq/practice" ? "art-practice" : ""];
+        return '<button class="gitem" data-a="go" data-h="' + g[0] + '"><span class="ic" style="background:' + g[4] + '22">' + g[1] + '</span><span><span class="t1 en" style="display:block">' + esc(g[2]) + '</span><span class="t2 ar">' + esc(g[3]) + (best != null ? " · أحسن نتيجة " + best : "") + "</span></span></button>";
+      }).join("") + "</div>";
+  };
+
+  R.artlearn = function () {
+    head("The Rules", "القاعدة بالأمثلة", true);
+    app.innerHTML = ART.rules.map(function (r) {
+      return '<div class="setbox"><div class="row" style="flex-wrap:nowrap;margin-bottom:10px"><span class="abadge" style="background:' + r.c + '">' + esc(r.t) + '</span><span class="ar" style="font-size:18px;font-weight:700">' + esc(r.ar) + "</span></div>" +
+        '<div class="lines">' + r.ex.map(function (x) {
+          return '<button class="line" data-a="say" data-t="' + esc(x[1]) + '"><span class="em">' + x[0] + '</span><span class="tx"><span class="en">' + esc(x[1]).replace(/^(an|a|the|The)\b/, "<b class=\"art\">$1</b>").replace(/\. (The)\b/, '. <b class="art">$1</b>') + '</span></span><span class="play">🔊</span></button>';
+        }).join("") + "</div></div>";
+    }).join("") + '<button class="btn green big" data-a="go" data-h="#artq/practice">✏️ <span class="ar">يلا نتمرّن</span></button>';
+  };
+
+  R.artq = function (mode) {
+    mode = mode === "test" ? "test" : "practice";
+    head(mode === "test" ? "Test" : "Circle the best article", mode === "test" ? "اختبار a / an / the" : "تمرين: اختار الأداة الصح", true);
+    var n = mode === "test" ? 20 : 10;
+    G = {run: G.run + 1, type: "art-" + mode, mode: mode, i: 0, score: 0, n: n, qs: shuffle(ART.sentences).slice(0, n), wrong: [], busy: false};
+    drawArt();
+  };
+  function drawArt() {
+    var q = G.qs[G.i], start = q[0].indexOf("___") === 0;
+    G.busy = false;
+    var opts = ["a", "an", "the"];
+    app.innerHTML = '<div class="q">' + progressBar() +
+      '<div class="qbox"><div class="row" style="justify-content:space-between"><span class="mascot-sm" style="font-size:40px">' + pick(FRIENDS) + '</span><span class="ar note" style="margin:0">' + (G.i + 1) + " من " + G.n + "</span></div>" +
+      '<div class="en asent">' + esc(q[0]).replace("___", '<span class="blank" id="ablank">____</span>') + "</div>" +
+      '<div class="hint ar">' + esc(q[3]) + "</div></div>" +
+      '<div class="optgrid three ltr">' + opts.map(function (o) { return '<button class="opt en" style="font-size:30px" data-a="aans" data-v="' + o + '">' + (start ? cap(o) : o) + "</button>"; }).join("") + "</div>" +
+      '<div id="averdict"></div></div>';
+  }
+  A.aans = function (el, d) {
+    if (G.busy) return;
+    G.busy = true;
+    var q = G.qs[G.i], ok = d.v === q[1], full = artFill(q[0], q[1]), start = q[0].indexOf("___") === 0;
+    app.querySelectorAll(".opt").forEach(function (b) { b.disabled = true; if (b.dataset.v === q[1]) b.classList.add("right"); });
+    var bl = $("#ablank"); bl.textContent = start ? cap(q[1]) : q[1]; bl.classList.add(ok ? "ok" : "no");
+    if (ok) { G.score++; SFX.good(); confetti(8); addStar(1); } else { el.classList.add("wrong"); SFX.bad(); G.wrong.push(q); }
+    if (G.mode === "test") {
+      /* test: quick mark, explanations come in the review at the end */
+      wait(ok ? 900 : 1500).then(function () { if (artAlive()) artNext(); });
+      return;
+    }
+    var v = $("#averdict"), last = G.i >= G.n - 1;
+    v.innerHTML = '<div class="verdict ' + (ok ? "good" : "bad") + '"><b class="ar">' + (ok ? "✅ صح! برافو عليك" : "❌ غلط، الإجابة الصح: " + (start ? cap(q[1]) : q[1])) + '</b>' +
+      '<span class="en" style="font-size:21px">' + esc(full) + '</span><div class="ar why">💡 ' + esc(ART.reasons[q[2]]) + "</div></div>" +
+      '<button class="btn ' + (ok ? "green" : "pink") + ' big" data-a="anext">' + (last ? '🏁 <span class="ar">شوف النتيجة</span>' : '<span class="ar">الجملة اللي بعدها</span> ⬅️') + "</button>";
+    v.scrollIntoView({behavior: "smooth", block: "nearest"});
+    wait(ok ? 1300 : 1800).then(function () { if (artAlive() && G.busy) say(full); });
+  };
+  A.anext = function () { hush(); artNext(); };
+  function artNext() {
+    if (!artAlive()) return;
+    G.i++;
+    if (G.i >= G.n) artFinish(); else drawArt();
+  }
+  function artFinish() {
+    var pct = G.score / G.n, stars = pct >= .9 ? 3 : pct >= .6 ? 2 : pct > 0 ? 1 : 0;
+    S.played++; S.best[G.type] = Math.max(S.best[G.type] || 0, G.score); addStar(stars); save();
+    SFX.win(); confetti(30);
+    var msg = stars === 3 ? ["Amazing!", "شاطر جداً!", "🏆"] : stars === 2 ? ["Good job!", "برافو عليك!", "🥳"] : ["Keep trying!", "كمّل وهتبقى أحسن!", "💪"];
+    app.innerHTML = '<div class="result"><div class="big">' + msg[2] + '</div><h2 class="en">' + msg[0] + '</h2><div class="ar note" style="font-size:20px">' + msg[1] + "</div>" +
+      '<div class="st">' + [0, 1, 2].map(function (k) { return "<i>" + (k < stars ? "⭐" : "☆") + "</i>"; }).join("") + "</div>" +
+      '<div class="ar" style="font-size:22px;margin-bottom:18px">' + G.score + " من " + G.n + "</div>" +
+      '<div class="row" style="justify-content:center"><button class="btn green" data-a="go" data-h="#artq/' + G.mode + '?' + Date.now() + '">🔄 <span class="ar">تاني</span></button><button class="btn white" data-a="go" data-h="#art">🅰️ <span class="ar">A, An, The</span></button></div>' +
+      (G.wrong.length ? '<div class="setbox" style="margin-top:18px;text-align:start"><h3 class="ar">📝 راجع الجمل اللي غلطت فيها</h3>' + G.wrong.map(function (q) {
+        var full = artFill(q[0], q[1]);
+        return '<button class="line" style="margin-bottom:8px" data-a="say" data-t="' + esc(full) + '"><span class="tx"><span class="en">' + esc(full) + '</span><span class="ar">💡 ' + esc(ART.reasons[q[2]]) + '</span></span><span class="play">🔊</span></button>';
+      }).join("") + "</div>" : "") + "</div>";
+    say(msg[0]);
+  }
+
+  /* speed game: a or an, one minute */
+  R.artgame = function () {
+    head("a or an?", "لعبة سريعة: عندك دقيقة", true);
+    G = {run: G.run + 1, type: "art-game", score: 0, streak: 0, best: 0, left: 60, busy: false, pool: shuffle(ART.nouns), k: 0, started: false};
+    app.innerHTML = '<div class="result"><div class="big">🎈</div><h2 class="en">a or an?</h2><p class="ar note" style="font-size:18px">هتظهرلك صورة وكلمة، اختار <b class="en">a</b> ولا <b class="en">an</b> بأسرع ما تقدر. عندك 60 ثانية!</p>' +
+      '<button class="btn green big" data-a="agstart">🚀 <span class="ar">ابدأ</span></button></div>';
+  };
+  A.agstart = function () {
+    var my = ++G.run; G.started = true;
+    drawAg();
+    G.timer = setInterval(function () {
+      if (my !== G.run || !artAlive()) { clearInterval(G.timer); return; }
+      G.left--;
+      var t = $("#agtime"); if (t) { t.style.width = (G.left / 60 * 100) + "%"; }
+      var s = $("#agsec"); if (s) s.textContent = G.left;
+      if (G.left <= 0) { clearInterval(G.timer); agEnd(); }
+    }, 1000);
+  };
+  function drawAg() {
+    if (G.k >= G.pool.length) { G.pool = shuffle(ART.nouns); G.k = 0; }
+    var n = G.pool[G.k];
+    G.busy = false;
+    app.innerHTML = '<div class="q"><div class="progress"><i id="agtime" style="width:' + (G.left / 60 * 100) + '%;transition:width 1s linear"></i></div>' +
+      '<div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="score"><span class="ok">✅ ' + G.score + '</span>' + (G.streak >= 3 ? '<span class="no" style="background:#fff3c4;color:#b07a00">🔥 ' + G.streak + "</span>" : "") + '</span><span class="ar" style="font-weight:700">⏱️ <b id="agsec" class="en">' + G.left + "</b> ث</span></div>" +
+      '<div class="qbox ag"><div class="em">' + n[0] + '</div><div class="w en"><span class="blank" id="ablank">___</span> ' + esc(n[2]) + "</div></div>" +
+      '<div class="optgrid ltr"><button class="opt en agbtn" data-a="agans" data-v="a">a</button><button class="opt en agbtn" data-a="agans" data-v="an">an</button></div>' +
+      '<div id="agwhy" class="ar note" style="text-align:center;min-height:48px;margin-top:12px"></div></div>';
+  }
+  A.agans = function (el, d) {
+    if (G.busy || G.left <= 0) return;
+    G.busy = true;
+    var n = G.pool[G.k], ok = d.v === n[1];
+    var bl = $("#ablank"); bl.textContent = n[1]; bl.classList.add(ok ? "ok" : "no");
+    el.classList.add(ok ? "right" : "wrong");
+    say(n[1] + " " + n[2], null, 1);
+    if (ok) { G.score++; G.streak++; G.best = Math.max(G.best, G.streak); SFX.good(); if (G.streak % 5 === 0) { confetti(14); toast("🔥 " + G.streak, "ممتاز! كمّل"); } }
+    else { G.streak = 0; tone([[220, 0, .3, "triangle", .2, 180]]); $("#agwhy").textContent = "💡 " + ART.reasons[n[3]]; }
+    G.k++;
+    wait(ok ? 650 : 1900).then(function () { if (artAlive() && G.left > 0 && G.type === "art-game") drawAg(); });
+  };
+  function agEnd() {
+    var s = G.score, stars = s >= 20 ? 3 : s >= 12 ? 2 : s > 0 ? 1 : 0;
+    var prev = S.best["art-game"] || 0;
+    S.played++; S.best["art-game"] = Math.max(prev, s); addStar(stars); save();
+    SFX.win(); confetti(30);
+    app.innerHTML = '<div class="result"><div class="big">' + (s > prev ? "🏆" : "🎈") + '</div><h2 class="en">Time is up!</h2><div class="ar note" style="font-size:20px">' + (s > prev ? "رقم قياسي جديد! 🎉" : "خلص الوقت!") + "</div>" +
+      '<div class="st">' + [0, 1, 2].map(function (k) { return "<i>" + (k < stars ? "⭐" : "☆") + "</i>"; }).join("") + "</div>" +
+      '<div class="ar" style="font-size:22px;margin-bottom:6px">جاوبت صح على <b class="en">' + s + "</b> كلمة</div>" +
+      '<div class="ar note" style="margin-bottom:18px">أطول سلسلة صح ورا بعض: 🔥 ' + G.best + " · أحسن نتيجة: " + S.best["art-game"] + "</div>" +
+      '<div class="row" style="justify-content:center"><button class="btn green" data-a="go" data-h="#artgame?' + Date.now() + '">🔄 <span class="ar">العب تاني</span></button><button class="btn white" data-a="go" data-h="#art">🅰️ <span class="ar">A, An, The</span></button></div></div>';
+    say(s > prev ? "Amazing!" : "Good job!");
+  }
 
   /* ---------- my stars ---------- */
   var STICKERS = ["🐶", "🐱", "🦁", "🐼", "🦄", "🐬", "🦖", "🚀", "🏎️", "⚽", "🏆", "🎸", "🍕", "🍦", "🌈", "🦋", "🐙", "🦊", "🐸", "🐧", "🐯", "🐨", "🚁", "🛸", "🎡", "🎢", "🧸", "🎁", "👑", "💎", "🌟", "🐉"];
