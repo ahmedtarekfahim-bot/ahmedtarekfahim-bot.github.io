@@ -325,3 +325,19 @@ b.art { color: var(--brand2); }
 .agbtn { font-size: 46px !important; min-height: 110px; }
 
 .optgrid.ltr { direction: ltr; }
+
+/* adjectives */
+.wordchips.spot { margin: 14px 0 8px; }
+.wordchips.spot .wchip { background: #fff; box-shadow: 0 4px 0 var(--line); border: 3px solid var(--line); font-size: 22px; }
+.wordchips.spot .wchip.picked { background: #fff3c4; border-color: var(--sun); box-shadow: 0 4px 0 #e0a800; text-decoration: underline; text-decoration-color: var(--brand2); text-decoration-thickness: 3px; text-underline-offset: 5px; }
+.wordchips.spot .wchip.good { background: #d9f8e7; border-color: var(--ok); box-shadow: 0 4px 0 #1f9656; }
+.wordchips.spot .wchip.bad { background: #ffe1e1; border-color: var(--bad); box-shadow: 0 4px 0 #d63c3c; text-decoration: line-through; }
+.wordchips.spot .wchip.missed { border: 3px dashed var(--ok); color: #1f9656; }
+.wordchips.spot .wchip[disabled] { opacity: 1; }
+.mcard .ba.oppface { display: flex; flex-direction: column; gap: 2px; font-size: 18px; }
+.defbox .line { box-shadow: none; padding: 4px; }
+.defbox .line .tx .en { font-size: 22px; }
+.defbox .line .tx .ar { font-size: 17px; color: var(--ink); line-height: 1.6; }
+
+.verdict .why .en, .verdict .why b { font-size: inherit; }
+.verdict .why b { display: inline; margin: 0; }

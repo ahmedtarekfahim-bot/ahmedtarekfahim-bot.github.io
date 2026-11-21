@@ -4,7 +4,7 @@
 
   /* ---------- storage ---------- */
   var KEY = "super-kid-v1";
-  var APP_V = "5";
+  var APP_V = "6";
   var DEF = {
     name: "", rate: 0.85, voice: "", voiceSet: "en1", reps: 2, gap: 3, auto: true, ar: false, sfx: true,
     gameCats: [], stars: 0, played: 0, best: {}, learned: {},
@@ -218,6 +218,7 @@
   function parent(h) {
     var p = h.replace(/^#/, "").split("?")[0].split("/");
     if (p[0] === "artlearn" || p[0] === "artq" || p[0] === "artgame") return "#art";
+    if (p[0] === "adjlearn" || p[0] === "adjq" || p[0] === "adjpic" || p[0] === "adjopp") return "#adj";
     if (p[0] === "cat" || p[0] === "play" && p[1] === "w") return "#words";
     if (p[0] === "grp" || p[0] === "play" && p[1] === "s") return "#sent";
     if (p[0] === "verb" || p[0] === "play" && p[1] === "v") return "#verbs";
@@ -280,6 +281,7 @@
       tile("#sent", "💬", "Sentences", "الجمل", "#2ec4b6", SENT.reduce(function (a, g) { return a + g.s.length; }, 0)) +
       tile("#games", "🎮", "Games", "الألعاب", "#6c4cff") +
       tile("#art", "🅰️", "A, An, The", "أدوات a / an / the", "#ef5350", ART.sentences.length) +
+      tile("#adj", "🦋", "Adjectives", "الصفات", "#8e44ad", ADJ.spot.length + ADJ.choose.length) +
       tile("#math", "🧮", "Math", "الرياضيات", "#00a8e8") +
       tile("#me", "⭐", "My Stars", "نجومي وملصقاتي", "#ffb300") +
       "</div>" +
@@ -287,7 +289,7 @@
       '<button class="line" data-a="say" data-t="' + esc(wod.en) + '" data-ar="' + esc(wod.ar) + '">' + emo(wod.em) +
       '<span class="tx"><span class="en">' + esc(wod.en) + '</span><span class="ar">' + esc(wod.ar) + '</span></span><span class="play">🔊</span></button>' +
       '<div class="row" style="margin-top:18px"><button class="btn white big" data-a="go" data-h="#settings">⚙️ <span class="ar">الإعدادات: الصوت والتكرار</span></button></div>' +
-      '<p class="note ar" style="text-align:center;margin-top:14px">نسخة ' + APP_V + " · 🅰️ جديد: قسم A, An, The</p>";
+      '<p class="note ar" style="text-align:center;margin-top:14px">نسخة ' + APP_V + " · 🦋 جديد: قسم Adjectives</p>";
   };
   function tile(h, ic, t1, t2, color, cnt) {
     return '<button class="tile" style="background:' + color + '" data-a="go" data-h="' + h + '">' + (cnt ? '<span class="cnt">' + cnt + "</span>" : "") +
@@ -1015,6 +1017,213 @@
       '<div class="row" style="justify-content:center"><button class="btn green" data-a="go" data-h="#artgame?' + Date.now() + '">🔄 <span class="ar">العب تاني</span></button><button class="btn white" data-a="go" data-h="#art">🅰️ <span class="ar">A, An, The</span></button></div></div>';
     say(s > prev ? "Amazing!" : "Good job!");
   }
+
+  /* ---------- adjectives ---------- */
+  var ADJ_AR = {hungry: "جوعان", heavy: "ثقيل", light: "خفيف", weak: "ضعيف", bright: "منوّر", short: "قصير", noisy: "مزعج", full: "مليان", empty: "فاضي", easy: "سهل", difficult: "صعب"};
+  ADJ.groups.forEach(function (g) { g.w.forEach(function (w) { if (!ADJ_AR[w[1]]) ADJ_AR[w[1]] = w[2]; }); });
+  ADJ.pic.forEach(function (p) { if (!ADJ_AR[p[1]]) ADJ_AR[p[1]] = p[2]; });
+  function adjAlive() { return location.hash.indexOf("#adj") === 0; }
+  function wnorm(w) { return w.toLowerCase().replace(/[^a-z']/g, ""); }
+  function adjFill(s, a) { return s.replace("___", a); }
+
+  R.adj = function () {
+    head("Adjectives", "الصفات", true);
+    var items = [
+      ["#adjlearn", "📖", "What is an adjective?", "يعني إيه صفة؟ القاعدة وكلمات كتير بالصور", "#ff8a3d", ""],
+      ["#adjq/spot", "🔍", "Spot the Adjective", "اضغط على الصفات اللي في الجملة (زي Underline)", "#2ec4b6", "adj-spot"],
+      ["#adjq/choose", "✏️", "Choose the Adjective", "اختار الصفة المناسبة للفراغ", "#ff5fa2", "adj-choose"],
+      ["#adjpic", "🖼️", "Describe the Picture", "لعبة: أنهي صفة بتوصف الصورة؟", "#ffb300", "adj-pic"],
+      ["#adjopp", "🃏", "Opposites Match", "لعبة الذاكرة: طابق الصفة بعكسها", "#00a8e8", "adj-opp"],
+      ["#adjq/test", "📝", "Test", "اختبار 15 سؤال، والنتيجة والمراجعة في الآخر", "#6c4cff", "adj-test"]
+    ];
+    app.innerHTML = '<div class="hero" style="margin-bottom:12px"><span class="mascot-sm">🦋</span><div class="bubble"><span class="en">a <b>big</b> elephant · a <b>red</b> apple · a <b>happy</b> girl</span><br><span class="ar">الصفة بتوصف الاسم: شكله ولونه وحجمه وطعمه</span></div></div>' +
+      '<div class="gamelist">' + items.map(function (g) {
+        var best = g[5] ? S.best[g[5]] : null;
+        return '<button class="gitem" data-a="go" data-h="' + g[0] + '"><span class="ic" style="background:' + g[4] + '22">' + g[1] + '</span><span><span class="t1 en" style="display:block">' + esc(g[2]) + '</span><span class="t2 ar">' + esc(g[3]) + (best != null ? " · أحسن نتيجة " + best : "") + "</span></span></button>";
+      }).join("") + "</div>";
+  };
+
+  R.adjlearn = function () {
+    head("What is an adjective?", "يعني إيه صفة؟", true);
+    app.innerHTML =
+      '<div class="setbox defbox"><button class="line" data-a="say" data-t="' + esc(ADJ.def) + '"><span class="em">📌</span><span class="tx"><span class="en">' + esc(ADJ.def) + '</span><span class="ar">' + esc(ADJ.defAr) + '</span></span><span class="play">🔊</span></button></div>' +
+      '<h2 class="sec">📍 <span class="ar">الصفة بتيجي فين؟</span></h2><div class="lines">' + ADJ.where.map(function (x) {
+        return '<button class="line" data-a="say" data-t="' + esc(x[1]) + '"><span class="em">' + x[0] + '</span><span class="tx"><span class="en">' + esc(x[1]).replace(/\b(red|fluffy|happy)\b/g, '<b class="art">$1</b>') + '</span><span class="ar">' + esc(x[2]) + '</span></span><span class="play">🔊</span></button>';
+      }).join("") + "</div>" +
+      '<p class="note ar" style="margin-top:12px">💡 الأرقام زي <b class="en">two</b> و <b class="en">three</b> بتوصف العدد، فساعات المدرسة بتحسبها صفات كمان.</p>' +
+      ADJ.groups.map(function (g) {
+        return '<h2 class="sec"><span class="abadge" style="background:' + g.c + ';height:40px;min-width:40px;font-size:18px;border-radius:12px">' + g.w[0][0] + '</span> <span class="en">' + esc(g.t) + '</span> <span class="ar note" style="margin:0">' + esc(g.ar) + "</span></h2>" +
+          '<div class="cards">' + g.w.map(function (w) {
+            return '<button class="card" data-a="say" data-t="' + esc(w[1]) + '">' + emo(w[0]) + '<span class="w en">' + esc(w[1]) + '</span><span class="m ar">' + esc(w[2]) + "</span></button>";
+          }).join("") + "</div>";
+      }).join("") +
+      '<button class="btn green big" style="margin-top:18px" data-a="go" data-h="#adjq/spot">🔍 <span class="ar">يلا نلاقي الصفات</span></button>';
+  };
+
+  /* practice and test: spot (tap the adjectives) + choose (fill the blank) */
+  R.adjq = function (mode) {
+    mode = mode === "spot" || mode === "choose" ? mode : "test";
+    var titles = {spot: ["Spot the Adjective", "اضغط على كل الصفات اللي في الجملة"], choose: ["Choose the Adjective", "اختار الصفة المناسبة"], test: ["Test", "اختبار الصفات"]};
+    head(titles[mode][0], titles[mode][1], true);
+    var qs;
+    if (mode === "spot") qs = shuffle(ADJ.spot).slice(0, 8).map(function (s) { return {k: "spot", s: s, sel: []}; });
+    else if (mode === "choose") qs = shuffle(ADJ.choose).slice(0, 10).map(function (c) { return {k: "choose", c: c, opts: shuffle([c[1]].concat(c[2]))}; });
+    else qs = shuffle(shuffle(ADJ.choose).slice(0, 10).map(function (c) { return {k: "choose", c: c, opts: shuffle([c[1]].concat(c[2]))}; })
+      .concat(shuffle(ADJ.spot).slice(0, 5).map(function (s) { return {k: "spot", s: s, sel: []}; })));
+    G = {run: G.run + 1, type: "adj-" + mode, mode: mode, i: 0, score: 0, n: qs.length, qs: qs, review: [], busy: false};
+    drawAdj();
+  };
+  function spotTargets(s) {
+    var words = s[0].split(" "), adjs = s[1].map(function (p) { return p[0]; }), extra = s[3] || [], tgt = [], opt = [];
+    words.forEach(function (w, i) {
+      var n = wnorm(w);
+      if (adjs.indexOf(n) >= 0) tgt.push(i); else if (extra.indexOf(n) >= 0) opt.push(i);
+    });
+    return {words: words, tgt: tgt, opt: opt};
+  }
+  function drawAdj() {
+    var q = G.qs[G.i];
+    G.busy = false;
+    var h = '<div class="q">' + progressBar() + '<div class="qbox"><div class="row" style="justify-content:space-between"><span class="mascot-sm" style="font-size:40px">' + pick(FRIENDS) + '</span><span class="ar note" style="margin:0">' + (G.i + 1) + " من " + G.n + "</span></div>";
+    if (q.k === "spot") {
+      var t = spotTargets(q.s);
+      h += '<div class="ar hint" style="font-weight:700;color:var(--brand2)">اضغط على كل الصفات (ممكن تكون أكتر من واحدة)</div>' +
+        '<div class="wordchips spot">' + t.words.map(function (w, i) { return '<button class="wchip' + (q.sel.indexOf(i) >= 0 ? " picked" : "") + '" data-a="spotw" data-i="' + i + '">' + esc(w) + "</button>"; }).join("") + "</div>" +
+        '<div class="hint ar">' + esc(q.s[2]) + "</div></div>" +
+        '<button class="btn green big" data-a="spotcheck" id="spotok"' + (q.sel.length ? "" : " disabled") + '>✓ <span class="ar">تأكيد</span></button>';
+    } else {
+      h += '<div class="en asent">' + esc(q.c[0]).replace("___", '<span class="blank" id="ablank">____</span>') + '</div><div class="hint ar">' + esc(q.c[3]) + "</div></div>" +
+        '<div class="optgrid ltr' + (q.opts.length === 3 ? " three" : "") + '">' + q.opts.map(function (o) { return '<button class="opt en" style="font-size:24px" data-a="adjans" data-v="' + esc(o) + '">' + esc(o) + "</button>"; }).join("") + "</div>";
+    }
+    app.innerHTML = h + '<div id="averdict"></div></div>';
+  }
+  A.spotw = function (el, d) {
+    var q = G.qs[G.i]; if (G.busy) return;
+    var i = +d.i, k = q.sel.indexOf(i);
+    if (k >= 0) q.sel.splice(k, 1); else { q.sel.push(i); say(wnorm(q.s[0].split(" ")[i]), null, 1); }
+    el.classList.toggle("picked", k < 0); SFX.tap();
+    $("#spotok").disabled = !q.sel.length;
+  };
+  A.spotcheck = function () {
+    var q = G.qs[G.i]; if (G.busy || !q.sel.length) return;
+    G.busy = true;
+    $("#spotok").style.display = "none";
+    var t = spotTargets(q.s), sel = q.sel.filter(function (i) { return t.opt.indexOf(i) < 0; });
+    var ok = sel.length === t.tgt.length && t.tgt.every(function (i) { return sel.indexOf(i) >= 0; });
+    app.querySelectorAll(".wordchips.spot .wchip").forEach(function (b, i) {
+      b.disabled = true;
+      if (t.tgt.indexOf(i) >= 0) b.classList.add(q.sel.indexOf(i) >= 0 ? "good" : "missed");
+      else if (q.sel.indexOf(i) >= 0 && t.opt.indexOf(i) < 0) b.classList.add("bad");
+    });
+    var why = q.s[1].map(function (p) { return "كلمة <b class=\"en\">" + esc(p[0]) + "</b> (" + esc(ADJ_AR[p[0]] || "") + ") بتوصف <b class=\"en\">" + esc(p[1]) + "</b>"; }).join("<br>");
+    adjVerdict(ok, ok ? "✅ صح! لقيت كل الصفات" : "❌ مش كده بالظبط، الصفات هي: " + q.s[1].map(function (p) { return p[0]; }).join(" و "), q.s[0], why, q.s[0]);
+  };
+  A.adjans = function (el, d) {
+    var q = G.qs[G.i]; if (G.busy) return;
+    G.busy = true;
+    var ok = d.v === q.c[1], full = adjFill(q.c[0], q.c[1]);
+    app.querySelectorAll(".opt").forEach(function (b) { b.disabled = true; if (b.dataset.v === q.c[1]) b.classList.add("right"); });
+    if (!ok) el.classList.add("wrong");
+    var bl = $("#ablank"); bl.textContent = q.c[1]; bl.classList.add(ok ? "ok" : "no");
+    var why = q.opts.map(function (o) { return '<span class="en"><b>' + esc(o) + "</b></span> = " + esc(ADJ_AR[o] || "") + (o === q.c[1] ? " ✔️" : ""); }).join(" · ");
+    adjVerdict(ok, ok ? "✅ صح! برافو عليك" : "❌ غلط، الإجابة الصح: " + q.c[1], full, why, full);
+  };
+  function adjVerdict(ok, title, full, why, spoken) {
+    if (ok) { G.score++; SFX.good(); confetti(8); addStar(1); } else { SFX.bad(); G.review.push([full, why]); }
+    if (G.mode === "test") { wait(ok ? 900 : 1600).then(function () { if (adjAlive()) adjNext(); }); return; }
+    var v = $("#averdict"), last = G.i >= G.n - 1;
+    v.innerHTML = '<div class="verdict ' + (ok ? "good" : "bad") + '"><b class="ar">' + esc(title) + '</b><span class="en" style="font-size:21px">' + esc(full) + '</span><div class="ar why">💡 ' + why + "</div></div>" +
+      '<button class="btn ' + (ok ? "green" : "pink") + ' big" data-a="adjnext">' + (last ? '🏁 <span class="ar">شوف النتيجة</span>' : '<span class="ar">اللي بعده</span> ⬅️') + "</button>";
+    v.scrollIntoView({behavior: "smooth", block: "nearest"});
+    wait(ok ? 1300 : 1800).then(function () { if (adjAlive() && G.busy) say(spoken); });
+  }
+  A.adjnext = function () { hush(); adjNext(); };
+  function adjNext() {
+    if (!adjAlive()) return;
+    G.i++;
+    if (G.i >= G.n) adjFinish(); else drawAdj();
+  }
+  function adjFinish(again) {
+    var pct = G.score / G.n, stars = pct >= .9 ? 3 : pct >= .6 ? 2 : pct > 0 ? 1 : 0;
+    S.played++; S.best[G.type] = Math.max(S.best[G.type] || 0, G.score); addStar(stars); save();
+    SFX.win(); confetti(30);
+    var msg = stars === 3 ? ["Amazing!", "شاطر جداً!", "🏆"] : stars === 2 ? ["Good job!", "برافو عليك!", "🥳"] : ["Keep trying!", "كمّل وهتبقى أحسن!", "💪"];
+    app.innerHTML = '<div class="result"><div class="big">' + msg[2] + '</div><h2 class="en">' + msg[0] + '</h2><div class="ar note" style="font-size:20px">' + msg[1] + "</div>" +
+      '<div class="st">' + [0, 1, 2].map(function (k) { return "<i>" + (k < stars ? "⭐" : "☆") + "</i>"; }).join("") + "</div>" +
+      '<div class="ar" style="font-size:22px;margin-bottom:18px">' + G.score + " من " + G.n + "</div>" +
+      '<div class="row" style="justify-content:center"><button class="btn green" data-a="go" data-h="' + (again || "#adjq/" + G.mode) + "?" + Date.now() + '">🔄 <span class="ar">تاني</span></button><button class="btn white" data-a="go" data-h="#adj">🦋 <span class="en">Adjectives</span></button></div>' +
+      (G.review.length ? '<div class="setbox" style="margin-top:18px;text-align:start"><h3 class="ar">📝 راجع اللي غلطت فيه</h3>' + G.review.map(function (r) {
+        return '<button class="line" style="margin-bottom:8px" data-a="say" data-t="' + esc(r[0]) + '"><span class="tx"><span class="en">' + esc(r[0]) + '</span><span class="ar">💡 ' + r[1] + '</span></span><span class="play">🔊</span></button>';
+      }).join("") + "</div>" : "") + "</div>";
+    say(msg[0]);
+  }
+
+  /* game: which adjective describes the picture? */
+  R.adjpic = function () {
+    head("Describe the Picture", "أنهي صفة بتوصف الصورة؟", true);
+    var all = ADJ.pic.map(function (p) { return p[1]; });
+    var qs = shuffle(ADJ.pic).slice(0, 10).map(function (p) {
+      var other = shuffle(all.filter(function (w) { return w !== p[1] && w !== p[3]; }))[0];
+      return {p: p, opts: shuffle([p[1], p[3], other])};
+    });
+    G = {run: G.run + 1, type: "adj-pic", mode: "pic", i: 0, score: 0, n: qs.length, qs: qs, review: [], busy: false};
+    drawPic();
+  };
+  function drawPic() {
+    var q = G.qs[G.i];
+    G.busy = false;
+    app.innerHTML = '<div class="q">' + progressBar() + '<div class="qbox ag"><div class="em">' + q.p[0] + '</div><div class="ar hint">أنهي صفة بتوصف الصورة دي؟</div></div>' +
+      '<div class="optgrid ltr three">' + q.opts.map(function (o) { return '<button class="opt en" style="font-size:24px" data-a="picans" data-v="' + esc(o) + '">' + esc(o) + "</button>"; }).join("") + "</div>" +
+      '<div id="agwhy" class="ar note" style="text-align:center;min-height:48px;margin-top:12px"></div></div>';
+  }
+  A.picans = function (el, d) {
+    var q = G.qs[G.i]; if (G.busy) return;
+    G.busy = true;
+    var ok = d.v === q.p[1];
+    app.querySelectorAll(".opt").forEach(function (b) { b.disabled = true; if (b.dataset.v === q.p[1]) b.classList.add("right"); });
+    if (ok) { G.score++; SFX.good(); confetti(8); addStar(1); }
+    else { el.classList.add("wrong"); SFX.bad(); G.review.push([q.p[1], q.p[0] + " " + esc(q.p[1]) + " = " + esc(q.p[2])]); }
+    $("#agwhy").innerHTML = '<b class="en">' + esc(q.p[1]) + "</b> = " + esc(q.p[2]) + " · عكسها <b class=\"en\">" + esc(q.p[3]) + "</b>";
+    say(q.p[1]);
+    wait(ok ? 1200 : 2200).then(function () {
+      if (location.hash.indexOf("#adjpic") !== 0) return;
+      G.i++; if (G.i >= G.n) adjFinish("#adjpic"); else drawPic();
+    });
+  };
+
+  /* game: match each adjective with its opposite */
+  R.adjopp = function () {
+    head("Opposites Match", "طابق الصفة بعكسها", true);
+    var used = {}, pairs = [];
+    shuffle(ADJ.opp).forEach(function (o) {
+      if (pairs.length >= 6 || used[o[0]] || used[o[2]]) return;
+      used[o[0]] = used[o[2]] = 1; pairs.push(o);
+    });
+    var cards = [];
+    pairs.forEach(function (o, i) { cards.push({p: i, w: o[0], e: o[1]}); cards.push({p: i, w: o[2], e: o[3]}); });
+    G = {run: G.run + 1, type: "adj-opp", mode: "opp", score: 0, n: 10, i: 10, cards: shuffle(cards), open: [], moves: 0, found: 0, pairs: pairs, review: [], busy: false};
+    app.innerHTML = '<p class="note ar" style="text-align:center">اقلب كارتين: الصفة وعكسها (big ↔ small) 🃏</p><div class="memory">' + G.cards.map(function (c, i) {
+      return '<button class="mcard" data-a="oppflip" data-i="' + i + '"><div class="fl"><div class="fa">❓</div><div class="ba oppface"><span style="font-size:34px">' + c.e + '</span><span class="en">' + esc(c.w) + "</span></div></div></button>";
+    }).join("") + '</div><p class="note ar" style="text-align:center;margin-top:14px" id="moves">المحاولات: 0</p>';
+  };
+  A.oppflip = function (el, d) {
+    var i = +d.i, c = G.cards[i];
+    if (G.busy || c.done || G.open.indexOf(i) >= 0) return;
+    el.classList.add("open"); G.open.push(i);
+    say(c.w, null, 1);
+    if (G.open.length < 2) return;
+    G.moves++; $("#moves").textContent = "المحاولات: " + G.moves;
+    var a = G.cards[G.open[0]], b = G.cards[G.open[1]], els = app.querySelectorAll(".mcard");
+    if (a.p === b.p) {
+      a.done = b.done = true; G.found++;
+      els[G.open[0]].classList.add("done"); els[G.open[1]].classList.add("done"); G.open = [];
+      SFX.good(); addStar(1); toast(a.w + " ↔ " + b.w, (ADJ_AR[a.w] || "") + " ↔ " + (ADJ_AR[b.w] || ""));
+      if (G.found === G.pairs.length) { G.score = Math.max(0, Math.min(10, 10 - Math.max(0, G.moves - 8))); setTimeout(function () { if (location.hash.indexOf("#adjopp") === 0) adjFinish("#adjopp"); }, 900); }
+    } else {
+      G.busy = true;
+      setTimeout(function () { els[G.open[0]].classList.remove("open"); els[G.open[1]].classList.remove("open"); G.open = []; G.busy = false; }, 1000);
+    }
+  };
 
   /* ---------- my stars ---------- */
   var STICKERS = ["🐶", "🐱", "🦁", "🐼", "🦄", "🐬", "🦖", "🚀", "🏎️", "⚽", "🏆", "🎸", "🍕", "🍦", "🌈", "🦋", "🐙", "🦊", "🐸", "🐧", "🐯", "🐨", "🚁", "🛸", "🎡", "🎢", "🧸", "🎁", "👑", "💎", "🌟", "🐉"];
